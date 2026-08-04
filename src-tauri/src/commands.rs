@@ -1,0 +1,69 @@
+use serde_json::Value;
+use tauri::State;
+
+use crate::{
+    engine::{AddRequest, TorrentSource},
+    storage::settings::Settings,
+    AppState,
+};
+
+fn message(error: anyhow::Error) -> String {
+    format!("{error:#}")
+}
+
+#[tauri::command]
+pub async fn list_torrents(state: State<'_, AppState>) -> Result<Value, String> {
+    state.engine.list().await.map_err(message)
+}
+
+#[tauri::command]
+pub async fn inspect_torrent(
+    source: TorrentSource,
+    destination: String,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    state
+        .engine
+        .inspect(source, destination)
+        .await
+        .map_err(message)
+}
+
+#[tauri::command]
+pub async fn add_torrent(request: AddRequest, state: State<'_, AppState>) -> Result<Value, String> {
+    state.engine.add(request).await.map_err(message)
+}
+
+#[tauri::command]
+pub async fn pause_torrent(id: usize, state: State<'_, AppState>) -> Result<(), String> {
+    state.engine.pause(id).await.map_err(message)
+}
+
+#[tauri::command]
+pub async fn resume_torrent(id: usize, state: State<'_, AppState>) -> Result<(), String> {
+    state.engine.resume(id).await.map_err(message)
+}
+
+#[tauri::command]
+pub async fn remove_torrent(
+    id: usize,
+    delete_files: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state.engine.remove(id, delete_files).await.map_err(message)
+}
+
+#[tauri::command]
+pub async fn torrent_details(id: usize, state: State<'_, AppState>) -> Result<Value, String> {
+    state.engine.details(id).await.map_err(message)
+}
+
+#[tauri::command]
+pub fn get_settings(state: State<'_, AppState>) -> Settings {
+    state.settings.get()
+}
+
+#[tauri::command]
+pub fn save_settings(settings: Settings, state: State<'_, AppState>) -> Result<(), String> {
+    state.settings.save(settings).map_err(message)
+}

@@ -1,0 +1,36 @@
+[package]
+name = "torrentory-client"
+version = "0.1.0"
+description = "A minimal, native BitTorrent client from Torrentory"
+authors = ["Torrentory"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "torrentory_client_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+librqbit = "8.1.1"
+async-trait = "0.1.91"
+anyhow = "1.0.104"
+directories = "6.0.0"
+tokio = { version = "1", features = ["time", "rt-multi-thread", "macros"] }
+url = "2.5.8"
+tauri-plugin-dialog = "2.7.2"
+tauri-plugin-notification = "2.3.3"
+tauri-plugin-deep-link = "2.4.9"
+tauri-plugin-single-instance = "2.4.3"
+tauri-plugin-window-state = "2.4.1"
+tauri-plugin-autostart = "2.5.1"
