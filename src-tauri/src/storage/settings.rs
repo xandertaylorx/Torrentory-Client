@@ -14,6 +14,8 @@ pub struct Settings {
     pub launch_at_login: bool,
     pub continue_in_background: bool,
     pub completion_notifications: bool,
+    #[serde(default)]
+    pub default_client_prompt_dismissed: bool,
     pub confirm_remove: bool,
     pub confirm_delete_files: bool,
     pub download_limit_kbps: u64,
@@ -42,6 +44,7 @@ impl Default for Settings {
             launch_at_login: false,
             continue_in_background: true,
             completion_notifications: true,
+            default_client_prompt_dismissed: false,
             confirm_remove: true,
             confirm_delete_files: true,
             download_limit_kbps: 0,

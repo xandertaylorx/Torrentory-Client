@@ -1,4 +1,5 @@
 mod commands;
+mod default_client;
 pub mod engine;
 pub mod storage;
 
@@ -107,6 +108,8 @@ pub fn run() {
             commands::torrent_details,
             commands::get_settings,
             commands::save_settings,
+            commands::get_default_client_status,
+            commands::make_default_torrent_client,
         ]);
 
     builder

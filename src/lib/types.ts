@@ -59,6 +59,7 @@ export interface Settings {
   launchAtLogin: boolean;
   continueInBackground: boolean;
   completionNotifications: boolean;
+  defaultClientPromptDismissed: boolean;
   confirmRemove: boolean;
   confirmDeleteFiles: boolean;
   downloadLimitKbps: number;
@@ -66,4 +67,10 @@ export interface Settings {
   listeningPort: number;
   incomingConnections: boolean;
   appearance: Appearance;
+}
+
+export interface DefaultClientStatus {
+  supported: boolean;
+  isDefault: boolean;
+  currentHandler?: string | null;
 }

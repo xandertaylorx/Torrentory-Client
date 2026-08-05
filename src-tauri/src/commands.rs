@@ -2,6 +2,7 @@ use serde_json::Value;
 use tauri::State;
 
 use crate::{
+    default_client::{self, DefaultClientStatus},
     engine::{AddRequest, TorrentSource},
     storage::settings::Settings,
     AppState,
@@ -66,4 +67,14 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
 #[tauri::command]
 pub fn save_settings(settings: Settings, state: State<'_, AppState>) -> Result<(), String> {
     state.settings.save(settings).map_err(message)
+}
+
+#[tauri::command]
+pub fn get_default_client_status() -> DefaultClientStatus {
+    default_client::status()
+}
+
+#[tauri::command]
+pub fn make_default_torrent_client() -> Result<DefaultClientStatus, String> {
+    default_client::make_default()
 }

@@ -14,6 +14,7 @@
       <string>Owner</string>
       <key>LSItemContentTypes</key>
       <array>
+        <string>org.bittorrent.torrent</string>
         <string>com.torrentory.torrent-file</string>
       </array>
       <key>CFBundleTypeIconFile</key>
@@ -21,11 +22,11 @@
     </dict>
   </array>
 
-  <key>UTExportedTypeDeclarations</key>
+  <key>UTImportedTypeDeclarations</key>
   <array>
     <dict>
       <key>UTTypeIdentifier</key>
-      <string>com.torrentory.torrent-file</string>
+      <string>org.bittorrent.torrent</string>
       <key>UTTypeDescription</key>
       <string>BitTorrent metainfo</string>
       <key>UTTypeConformsTo</key>
@@ -38,13 +39,34 @@
       <key>UTTypeTagSpecification</key>
       <dict>
         <key>public.filename-extension</key>
-        <array>
-          <string>torrent</string>
-        </array>
+        <array><string>torrent</string></array>
         <key>public.mime-type</key>
-        <array>
-          <string>application/x-bittorrent</string>
-        </array>
+        <array><string>application/x-bittorrent</string></array>
+      </dict>
+    </dict>
+  </array>
+
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>com.torrentory.torrent-file</string>
+      <key>UTTypeDescription</key>
+      <string>BitTorrent metainfo</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>org.bittorrent.torrent</string>
+        <string>public.data</string>
+        <string>public.content</string>
+      </array>
+      <key>UTTypeIconFile</key>
+      <string>torrentory-document.icns</string>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array><string>torrent</string></array>
+        <key>public.mime-type</key>
+        <array><string>application/x-bittorrent</string></array>
       </dict>
     </dict>
   </array>

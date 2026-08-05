@@ -1,0 +1,7 @@
+From the Torrentory-Client project root:
+
+  tar -xzf ~/Downloads/Torrentory-default-client-feature.tar.gz -C .
+  npm run tauri build
+
+The build updates Cargo.lock for the two macOS-only Core Foundation dependencies.
+Install the rebuilt DMG from src-tauri/target/release/bundle/dmg/.
