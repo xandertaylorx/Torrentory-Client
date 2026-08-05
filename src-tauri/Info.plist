@@ -10,18 +10,42 @@
       <string>BitTorrent metainfo</string>
       <key>CFBundleTypeRole</key>
       <string>Viewer</string>
-      <key>CFBundleTypeExtensions</key>
+      <key>LSHandlerRank</key>
+      <string>Owner</string>
+      <key>LSItemContentTypes</key>
       <array>
-        <string>torrent</string>
-      </array>
-      <key>CFBundleTypeMIMETypes</key>
-      <array>
-        <string>application/x-bittorrent</string>
+        <string>com.torrentory.torrent-file</string>
       </array>
       <key>CFBundleTypeIconFile</key>
       <string>torrentory-document.icns</string>
-      <key>LSHandlerRank</key>
-      <string>Owner</string>
+    </dict>
+  </array>
+
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>com.torrentory.torrent-file</string>
+      <key>UTTypeDescription</key>
+      <string>BitTorrent metainfo</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+        <string>public.content</string>
+      </array>
+      <key>UTTypeIconFile</key>
+      <string>torrentory-document.icns</string>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>torrent</string>
+        </array>
+        <key>public.mime-type</key>
+        <array>
+          <string>application/x-bittorrent</string>
+        </array>
+      </dict>
     </dict>
   </array>
 </dict>
