@@ -31,10 +31,18 @@ export interface TorrentFile {
   included: boolean;
 }
 
+export interface PeerSummary {
+  connected: number;
+  connecting: number;
+  queued: number;
+  known: number;
+}
+
 export interface TorrentDetails extends TorrentItem {
   files: TorrentFile[];
   trackers?: string[];
   peers?: unknown[] | Record<string, unknown>;
+  peer_summary?: PeerSummary;
 }
 
 export interface TorrentSource {

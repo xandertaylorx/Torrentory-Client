@@ -159,7 +159,41 @@ impl TorrentEngine for RqbitEngine {
             .mgr_handle(torrent)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
             .stats();
-        details["stats"] = serde_json::to_value(stats)?;
+
+        let stats_value = serde_json::to_value(stats)?;
+
+        let peer_stats = stats_value
+            .pointer("/live/snapshot/peer_stats")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let live = peer_stats
+            .get("live")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+
+        let connecting = peer_stats
+            .get("connecting")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+
+        let queued = peer_stats
+            .get("queued")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+
+        let seen = peer_stats
+            .get("seen")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+
+        details["stats"] = stats_value;
+        details["peer_summary"] = json!({
+            "connected": live,
+            "connecting": connecting,
+            "queued": queued,
+            "known": seen
+        });
         let peers = self
             .api
             .api_peer_stats(torrent, Default::default())
