@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows:
@@ -12,10 +12,10 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -43,10 +43,10 @@ jobs:
           New-Item -ItemType Directory -Force -Path windows-release | Out-Null
           Copy-Item $installer.FullName "windows-release/Torrentory-Client_${version}_x64-setup.exe"
 
-      - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: torrentory-client-windows-x64
-          path: windows-release/*.exe
-          if-no-files-found: error
-          retention-days: 7
+      - name: Attach installer to GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          gh release upload "v$version" windows-release/*.exe --clobber
