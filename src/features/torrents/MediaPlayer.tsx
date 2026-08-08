@@ -1,22 +1,27 @@
 import {
-  Captions, Film, Maximize2, Music2, Pause, Play, RotateCcw, RotateCw,
+  Captions, Film, ListVideo, Maximize2, Minimize2, Music2, Pause, Play, RotateCcw, RotateCw,
   Volume2, VolumeX, X,
 } from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { mediaStreamUrl } from "../../lib/api";
+import { bytes } from "../../lib/format";
 import { extension, mediaKind, srtToVtt, subtitleLabel, type MediaKind } from "../../lib/media";
 import type { TorrentFile, TorrentStatus } from "../../lib/types";
 import { dragWindow } from "../../lib/window";
 
-interface SubtitleChoice { file: TorrentFile; fileId: number }
+interface MediaChoice { file: TorrentFile; fileId: number }
+interface SubtitleChoice extends MediaChoice {}
 
-export function MediaPlayer({ torrentId, torrentName, file, fileId, subtitles, torrentState, onResume, onClose }: {
+export function MediaPlayer({ torrentId, torrentName, file, fileId, playlist, subtitles, torrentState, onSelect, onResume, onClose }: {
   torrentId: number;
   torrentName?: string | null;
   file: TorrentFile;
   fileId: number;
+  playlist: MediaChoice[];
   subtitles: SubtitleChoice[];
   torrentState: TorrentStatus;
+  onSelect: (file: TorrentFile, fileId: number) => void;
   onResume: () => void;
   onClose: () => void;
 }) {
@@ -40,12 +45,21 @@ export function MediaPlayer({ torrentId, torrentName, file, fileId, subtitles, t
   const [rate, setRate] = useState(1);
   const [waiting, setWaiting] = useState(true);
   const [error, setError] = useState("");
+  const [fullscreen, setFullscreen] = useState(false);
+  const [playlistOpen, setPlaylistOpen] = useState(false);
+  const currentPlaylistIndex = playlist.findIndex(({ fileId: choiceId }) => choiceId === fileId);
   const subtitleIds = subtitles.map(({ fileId: subtitleId }) => subtitleId).join(",");
 
   useEffect(() => {
     let active = true;
     setUrl("");
     setError("");
+    setWaiting(true);
+    setPlaying(false);
+    setCurrent(0);
+    setDuration(0);
+    setBuffered(0);
+    setCaption(-1);
     void mediaStreamUrl(torrentId, fileId)
       .then((value) => active && setUrl(value))
       .catch((reason) => active && setError(String(reason)));
@@ -115,14 +129,55 @@ export function MediaPlayer({ torrentId, torrentName, file, fileId, subtitles, t
     if (media) media.currentTime = Math.max(0, Math.min(media.duration || 0, media.currentTime + seconds));
   }, []);
 
-  const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) void stageRef.current?.requestFullscreen();
-    else void document.exitFullscreen();
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if ("__TAURI_INTERNALS__" in window) {
+        const appWindow = getCurrentWindow();
+        const next = !(await appWindow.isFullscreen());
+        await appWindow.setFullscreen(next);
+        setFullscreen(next);
+      } else if (!document.fullscreenElement) {
+        await stageRef.current?.requestFullscreen();
+        setFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setFullscreen(false);
+      }
+    } catch (reason) {
+      setError(`Could not change full screen mode: ${String(reason)}`);
+    }
+  }, []);
+
+  const closePlayer = useCallback(async () => {
+    if (fullscreen && "__TAURI_INTERNALS__" in window) {
+      await getCurrentWindow().setFullscreen(false).catch(() => undefined);
+    } else if (document.fullscreenElement) {
+      await document.exitFullscreen().catch(() => undefined);
+    }
+    onClose();
+  }, [fullscreen, onClose]);
+
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) {
+      const syncBrowserFullscreen = () => setFullscreen(Boolean(document.fullscreenElement));
+      document.addEventListener("fullscreenchange", syncBrowserFullscreen);
+      return () => document.removeEventListener("fullscreenchange", syncBrowserFullscreen);
+    }
+    const appWindow = getCurrentWindow();
+    let active = true;
+    void appWindow.isFullscreen().then((value) => active && setFullscreen(value));
+    const unlisten = appWindow.onResized(() => {
+      void appWindow.isFullscreen().then((value) => active && setFullscreen(value));
+    });
+    return () => { active = false; void unlisten.then((fn) => fn()); };
   }, []);
 
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !document.fullscreenElement) onClose();
+      if (event.key === "Escape") {
+        if (fullscreen) { event.preventDefault(); void toggleFullscreen(); }
+        else onClose();
+      }
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
       if (event.code === "Space") { event.preventDefault(); void togglePlayback(); }
       if (event.key === "ArrowLeft") seekBy(-10);
@@ -132,7 +187,7 @@ export function MediaPlayer({ torrentId, torrentName, file, fileId, subtitles, t
     };
     addEventListener("keydown", keyboard);
     return () => removeEventListener("keydown", keyboard);
-  }, [kind, onClose, seekBy, toggleFullscreen, togglePlayback]);
+  }, [fullscreen, kind, onClose, seekBy, toggleFullscreen, togglePlayback]);
 
   useEffect(() => {
     if (kind !== "audio") return;
@@ -152,7 +207,7 @@ export function MediaPlayer({ torrentId, torrentName, file, fileId, subtitles, t
       const bars = 54;
       const gap = 3 * ratio;
       const barWidth = Math.max(2 * ratio, (width - gap * (bars - 1)) / bars);
-      const signal = getComputedStyle(document.documentElement).getPropertyValue("--signal").trim() || "#10b981";
+      const signal = getComputedStyle(document.documentElement).getPropertyValue("--fg").trim() || "#111111";
       context.fillStyle = signal;
       for (let index = 0; index < bars; index += 1) {
         const sample = data[Math.floor(index / bars * data.length)] ?? 0;
@@ -189,22 +244,26 @@ export function MediaPlayer({ torrentId, torrentName, file, fileId, subtitles, t
   };
 
   return <div className="media-backdrop" role="dialog" aria-modal="true" aria-label={`Playing ${file.name}`}>
-    <section className={`media-player media-${kind}`} ref={stageRef}>
-      <header className="media-head" onMouseDown={dragWindow}>
-        <div className="media-kind">{kind === "audio" ? <Music2 size={14} /> : <Film size={14} />}<span>{kind}</span></div>
-        <div className="media-title"><strong>{file.name}</strong><small>{torrentName}</small></div>
-        <button className="icon-button" onClick={onClose} aria-label="Close player"><X size={18} /></button>
+    <section className={`media-player media-${kind} ${fullscreen ? "is-fullscreen" : ""}`} ref={stageRef}>
+      <header className="media-head" data-tauri-drag-region onMouseDown={dragWindow}>
+        <div className="media-kind" data-tauri-drag-region>{kind === "audio" ? <Music2 size={14} /> : <Film size={14} />}<span data-tauri-drag-region>{kind}</span></div>
+        <div className="media-title" data-tauri-drag-region><strong data-tauri-drag-region>{file.name}</strong><small data-tauri-drag-region>{torrentName}</small></div>
+        <div className="media-head-actions" data-no-drag>
+          {playlist.length > 1 && <button className={`media-queue-trigger ${playlistOpen ? "active" : ""}`} onClick={() => setPlaylistOpen((value) => !value)} aria-label="Show media queue" aria-expanded={playlistOpen}><ListVideo size={15} /><span>{currentPlaylistIndex + 1} of {playlist.length}</span></button>}
+          <button className="icon-button" onClick={() => void closePlayer()} aria-label="Close player"><X size={18} /></button>
+        </div>
       </header>
       <div className="media-stage">
         {kind === "video" ?
-          <video ref={mediaRef as RefObject<HTMLVideoElement>} src={url} crossOrigin="anonymous" muted={muted} playsInline preload="metadata" onDoubleClick={toggleFullscreen} onClick={() => void togglePlayback()} onTimeUpdate={updateProgress} onProgress={updateProgress} onLoadedMetadata={() => { updateProgress(); setWaiting(false); }} onPlay={() => { setPlaying(true); setWaiting(false); }} onPause={() => setPlaying(false)} onWaiting={() => setWaiting(true)} onCanPlay={() => setWaiting(false)} onError={() => setError("This video format or codec is not supported by macOS.")}>
+          <video ref={mediaRef as RefObject<HTMLVideoElement>} src={url} crossOrigin="anonymous" muted={muted} playsInline autoPlay preload="metadata" onDoubleClick={() => void toggleFullscreen()} onClick={() => void togglePlayback()} onTimeUpdate={updateProgress} onProgress={updateProgress} onLoadedMetadata={() => { updateProgress(); setWaiting(false); }} onPlay={() => { setPlaying(true); setWaiting(false); }} onPause={() => setPlaying(false)} onWaiting={() => setWaiting(true)} onCanPlay={() => setWaiting(false)} onError={() => setError("This video format or codec is not supported by macOS.")}>
             {subtitleTracks.map((track, index) => <track key={track.url} kind="subtitles" src={track.url} srcLang={track.label.toLowerCase()} label={track.label} default={index === caption} />)}
           </video> :
           <div className="audio-visual">
             <div className="audio-orbit"><Music2 size={36} /></div>
             <canvas ref={canvasRef} aria-label="Live audio waveform" />
-            <audio ref={mediaRef as RefObject<HTMLAudioElement>} src={url} crossOrigin="anonymous" muted={muted} preload="metadata" onTimeUpdate={updateProgress} onProgress={updateProgress} onLoadedMetadata={() => { updateProgress(); setWaiting(false); }} onPlay={() => { setPlaying(true); setWaiting(false); }} onPause={() => setPlaying(false)} onWaiting={() => setWaiting(true)} onCanPlay={() => setWaiting(false)} onError={() => setError("This audio format or codec is not supported by macOS.")} />
+            <audio ref={mediaRef as RefObject<HTMLAudioElement>} src={url} crossOrigin="anonymous" muted={muted} autoPlay preload="metadata" onTimeUpdate={updateProgress} onProgress={updateProgress} onLoadedMetadata={() => { updateProgress(); setWaiting(false); }} onPlay={() => { ensureAnalyser(); setPlaying(true); setWaiting(false); }} onPause={() => setPlaying(false)} onWaiting={() => setWaiting(true)} onCanPlay={() => setWaiting(false)} onError={() => setError("This audio format or codec is not supported by macOS.")} />
           </div>}
+        {!playing && !waiting && !error && <button className="media-stage-play" onClick={() => void togglePlayback()} aria-label="Play"><Play size={24} fill="currentColor" /></button>}
         {waiting && !error && <div className="media-buffering"><i /><span>{url ? "Buffering pieces…" : "Preparing stream…"}</span></div>}
         {error && <div className="media-error"><strong>Playback unavailable</strong><span>{error}</span></div>}
       </div>
@@ -225,9 +284,13 @@ export function MediaPlayer({ torrentId, torrentName, file, fileId, subtitles, t
           <label className="media-select rate"><select value={rate} onChange={(event) => changeRate(Number(event.target.value))} aria-label="Playback speed">{[0.75, 1, 1.25, 1.5, 2].map((value) => <option value={value} key={value}>{value}×</option>)}</select></label>
           <button className="media-control" onClick={() => setMuted((value) => !value)} aria-label={muted ? "Unmute" : "Mute"}>{muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button>
           <input className="media-volume" type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} onChange={(event) => changeVolume(Number(event.target.value))} aria-label="Volume" />
-          {kind === "video" && <button className="media-control" onClick={toggleFullscreen} aria-label="Full screen"><Maximize2 size={16} /></button>}
+          {kind === "video" && <button className="media-control" onClick={() => void toggleFullscreen()} aria-label={fullscreen ? "Exit full screen" : "Full screen"}>{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>}
         </div>
       </footer>
+      {playlist.length > 1 && playlistOpen && <aside className="media-queue" aria-label="Media in this torrent">
+        <header><div><strong>Media queue</strong><span>{playlist.length} playable files</span></div><button className="icon-button" onClick={() => setPlaylistOpen(false)} aria-label="Close media queue"><X size={16} /></button></header>
+        <div className="media-queue-list">{playlist.map((choice, index) => { const choiceKind = mediaKind(choice.file.name); const active = choice.fileId === fileId; return <button className={active ? "active" : ""} key={`${choice.fileId}-${choice.file.name}`} onClick={() => { onSelect(choice.file, choice.fileId); setPlaylistOpen(false); }}><span className="media-queue-index">{active ? <Play size={11} fill="currentColor" /> : String(index + 1).padStart(2, "0")}</span><span className="media-queue-name"><strong>{choice.file.name}</strong><small>{choiceKind} · {bytes(choice.file.length)}</small></span></button>; })}</div>
+      </aside>}
     </section>
   </div>;
 }
