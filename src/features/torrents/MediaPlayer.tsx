@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { mediaStreamUrl } from "../../lib/api";
 import { extension, mediaKind, srtToVtt, subtitleLabel, type MediaKind } from "../../lib/media";
 import type { TorrentFile, TorrentStatus } from "../../lib/types";
+import { dragWindow } from "../../lib/window";
 
 interface SubtitleChoice { file: TorrentFile; fileId: number }
 
@@ -189,7 +190,7 @@ export function MediaPlayer({ torrentId, torrentName, file, fileId, subtitles, t
 
   return <div className="media-backdrop" role="dialog" aria-modal="true" aria-label={`Playing ${file.name}`}>
     <section className={`media-player media-${kind}`} ref={stageRef}>
-      <header className="media-head">
+      <header className="media-head" onMouseDown={dragWindow}>
         <div className="media-kind">{kind === "audio" ? <Music2 size={14} /> : <Film size={14} />}<span>{kind}</span></div>
         <div className="media-title"><strong>{file.name}</strong><small>{torrentName}</small></div>
         <button className="icon-button" onClick={onClose} aria-label="Close player"><X size={18} /></button>

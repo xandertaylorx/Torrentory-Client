@@ -10,6 +10,7 @@ import { TorrentRow } from "./features/torrents/TorrentRow";
 import { SettingsModal } from "./features/settings/SettingsModal";
 import { getDefaultClientStatus, getSettings, listTorrents, makeDefaultTorrentClient, pauseTorrent, removeTorrent, resumeTorrent, saveSettings } from "./lib/api";
 import type { DefaultClientStatus, Settings, TorrentItem, TorrentSource } from "./lib/types";
+import { dragWindow } from "./lib/window";
 import "./styles/app.css";
 
 type Filter = "all" | "downloading" | "completed";
@@ -94,7 +95,7 @@ export default function App() {
   };
 
   return <div className={`app-shell ${selectedItem ? "with-detail" : ""}`}>
-    <header className="titlebar" data-tauri-drag-region><div data-tauri-drag-region className="traffic-space" /><Logo /><div className="title-actions"><button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><SettingsIcon size={16} /></button><button className="button primary compact" onClick={() => { setIncoming(null); setAddOpen(true); }}><Plus size={14} /> Add torrent</button></div></header>
+    <header className="titlebar" onMouseDown={dragWindow}><div className="traffic-space" /><Logo /><div className="title-actions"><button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><SettingsIcon size={16} /></button><button className="button primary compact" onClick={() => { setIncoming(null); setAddOpen(true); }}><Plus size={14} /> Add torrent</button></div></header>
     <main className={`main-view ${showDefaultClientPrompt ? "has-default-client-banner" : ""}`}>
       {showDefaultClientPrompt && <section className="default-client-banner" aria-label="Default torrent client setup"><div className="default-client-icon"><Check size={15} /></div><div><strong>Make Torrentory your default torrent client</strong><span>Open .torrent files directly in Torrentory.</span></div><div className="default-client-actions"><button className="button quiet" onClick={() => void dismissDefaultPrompt()}>Not now</button><button className="button primary" disabled={makingDefault} onClick={() => void makeDefault()}>{makingDefault ? "Setting…" : "Make default"}</button></div></section>}
       <div className="toolbar"><div className="segments" role="tablist">{(["all", "downloading", "completed"] as Filter[]).map((name) => <button role="tab" aria-selected={filter === name} className={filter === name ? "active" : ""} key={name} onClick={() => setFilter(name)}>{name}<span>{name === "all" ? items.length : name === "completed" ? items.filter((i) => i.stats.finished).length : items.filter((i) => !i.stats.finished && i.stats.state === "live").length}</span></button>)}</div>{items.length > 4 && <label className="search"><Search size={14} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search torrents" /></label>}</div>
