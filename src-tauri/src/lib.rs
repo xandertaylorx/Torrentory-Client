@@ -3,6 +3,7 @@ mod default_client;
 pub mod engine;
 mod media_stream;
 pub mod storage;
+mod torrent_creator;
 
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
@@ -108,6 +109,7 @@ pub fn run() {
             commands::remove_torrent,
             commands::torrent_details,
             commands::media_stream_url,
+            commands::create_torrent_file,
             commands::get_settings,
             commands::save_settings,
             commands::get_default_client_status,

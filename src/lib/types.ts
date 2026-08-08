@@ -82,3 +82,12 @@ export interface DefaultClientStatus {
   isDefault: boolean;
   currentHandler?: string | null;
 }
+
+export interface CreateTorrentSummary {
+  outputPath: string;
+  infoHash: string;
+  fileCount: number;
+  totalBytes: number;
+  pieceLength: number;
+  trackerCount: number;
+}

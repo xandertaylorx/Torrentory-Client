@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { DefaultClientStatus, Inspection, Settings, TorrentDetails, TorrentItem, TorrentSource } from "./types";
+import type { CreateTorrentSummary, DefaultClientStatus, Inspection, Settings, TorrentDetails, TorrentItem, TorrentSource } from "./types";
 
 export async function listTorrents(): Promise<TorrentItem[]> {
   const value = await invoke<{ torrents: TorrentItem[] }>("list_torrents");
@@ -16,6 +16,8 @@ export const removeTorrent = (id: number, deleteFiles: boolean) =>
 export const torrentDetails = (id: number) => invoke<TorrentDetails>("torrent_details", { id });
 export const mediaStreamUrl = (id: number, fileId: number) =>
   invoke<string>("media_stream_url", { id, fileId });
+export const createTorrentFile = (sourcePath: string, outputPath: string, trackers: string[]) =>
+  invoke<CreateTorrentSummary>("create_torrent_file", { request: { sourcePath, outputPath, trackers } });
 export const getSettings = () => invoke<Settings>("get_settings");
 export const saveSettings = (settings: Settings) => invoke("save_settings", { settings });
 

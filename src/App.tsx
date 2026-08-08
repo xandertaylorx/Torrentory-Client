@@ -1,11 +1,12 @@
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen } from "@tauri-apps/api/event";
-import { Check, Plus, Search, Settings as SettingsIcon } from "lucide-react";
+import { Check, FilePlus2, Plus, Search, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Logo } from "./components/Logo";
 import { AddTorrentModal } from "./features/torrents/AddTorrentModal";
 import { DetailPanel } from "./features/torrents/DetailPanel";
 import { EmptyState } from "./features/torrents/EmptyState";
+import { CreateTorrentModal } from "./features/torrents/CreateTorrentModal";
 import { MediaPlayer } from "./features/torrents/MediaPlayer";
 import { TorrentRow } from "./features/torrents/TorrentRow";
 import { SettingsModal } from "./features/settings/SettingsModal";
@@ -30,6 +31,7 @@ export default function App() {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [incoming, setIncoming] = useState<TorrentSource | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [defaultClient, setDefaultClient] = useState<DefaultClientStatus | null>(null);
@@ -45,6 +47,7 @@ export default function App() {
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "o") { event.preventDefault(); setAddOpen(true); }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "n") { event.preventDefault(); setCreateOpen(true); }
       if ((event.metaKey || event.ctrlKey) && event.key === ",") { event.preventDefault(); setSettingsOpen(true); }
       if (event.key === "Escape") setSelected(null);
     };
@@ -137,7 +140,7 @@ export default function App() {
   };
 
   return <div className={`app-shell ${selectedItem ? "with-detail" : ""}`}>
-    <header className="titlebar" data-tauri-drag-region onMouseDown={dragWindow}><div className="traffic-space" data-tauri-drag-region /><div className="titlebar-brand" data-tauri-drag-region><Logo /></div><div className="title-actions"><button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><SettingsIcon size={16} /></button><button className="button primary compact" onClick={() => { setIncoming(null); setAddOpen(true); }}><Plus size={14} /> Add torrent</button></div></header>
+    <header className="titlebar" data-tauri-drag-region onMouseDown={dragWindow}><div className="traffic-space" data-tauri-drag-region /><div className="titlebar-brand" data-tauri-drag-region><Logo /></div><div className="title-actions"><button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><SettingsIcon size={16} /></button><button className="button compact" onClick={() => setCreateOpen(true)}><FilePlus2 size={14} /> Create</button><button className="button primary compact" onClick={() => { setIncoming(null); setAddOpen(true); }}><Plus size={14} /> Add torrent</button></div></header>
     <main className={`main-view ${showDefaultClientPrompt ? "has-default-client-banner" : ""}`}>
       {showDefaultClientPrompt && <section className="default-client-banner" aria-label="Default torrent client setup"><div className="default-client-icon"><Check size={15} /></div><div><strong>Make Torrentory your default torrent client</strong><span>Open .torrent files directly in Torrentory.</span></div><div className="default-client-actions"><button className="button quiet" onClick={() => void dismissDefaultPrompt()}>Not now</button><button className="button primary" disabled={makingDefault} onClick={() => void makeDefault()}>{makingDefault ? "Setting…" : "Make default"}</button></div></section>}
       <div className="toolbar"><div className="segments" role="tablist">{(["all", "downloading", "completed"] as Filter[]).map((name) => <button role="tab" aria-selected={filter === name} className={filter === name ? "active" : ""} key={name} onClick={() => setFilter(name)}>{name}<span>{name === "all" ? items.length : name === "completed" ? items.filter((i) => i.stats.finished).length : items.filter((i) => !i.stats.finished && i.stats.state === "live").length}</span></button>)}</div>{items.length > 4 && <label className="search"><Search size={14} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search torrents" /></label>}</div>
@@ -146,6 +149,7 @@ export default function App() {
     </main>
     {selectedItem && <DetailPanel item={selectedItem} onClose={() => setSelected(null)} onPlayFile={(details, file, fileId) => playFile(selectedItem, details, file, fileId)} onPause={() => void mutate(() => pauseTorrent(selectedItem.id))} onResume={() => void mutate(() => resumeTorrent(selectedItem.id))} />}
     {addOpen && settings && <AddTorrentModal initialSource={incoming} defaultDestination={settings.downloadLocation} onClose={() => { setAddOpen(false); setIncoming(null); }} onAdded={refresh} />}
+    {createOpen && <CreateTorrentModal onClose={() => setCreateOpen(false)} onCreated={setToast} />}
     {settingsOpen && settings && <SettingsModal value={settings} defaultClient={defaultClient} onDefaultClientChange={setDefaultClient} valueMakingDefault={makingDefault} onMakingDefaultChange={setMakingDefault} onToast={setToast} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
     {playback && <MediaPlayer torrentId={playback.item.id} torrentName={playback.item.name} file={playback.file} fileId={playback.fileId} playlist={playback.details.files.map((file, fileId) => ({ file, fileId })).filter(({ file }) => file.included && mediaKind(file.name))} subtitles={subtitlesFor(playback.details.files, playback.file)} torrentState={playback.item.stats.state} onSelect={(file, fileId) => playFile(playback.item, playback.details, file, fileId)} onResume={() => void mutate(() => resumeTorrent(playback.item.id))} onClose={() => setPlayback(null)} />}
     {toast && <div className="toast" role="alert">{toast}</div>}

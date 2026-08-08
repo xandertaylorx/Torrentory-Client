@@ -5,8 +5,16 @@ use crate::{
     default_client::{self, DefaultClientStatus},
     engine::{AddRequest, TorrentSource},
     storage::settings::Settings,
+    torrent_creator::{self, CreateTorrentRequest, CreateTorrentSummary},
     AppState,
 };
+
+#[tauri::command]
+pub async fn create_torrent_file(
+    request: CreateTorrentRequest,
+) -> Result<CreateTorrentSummary, String> {
+    torrent_creator::create(request).await.map_err(message)
+}
 
 fn message(error: anyhow::Error) -> String {
     format!("{error:#}")
