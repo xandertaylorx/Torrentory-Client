@@ -25,6 +25,8 @@ The initial list is loaded with a Tauri command. After that, the backend emits `
 
 The rqbit session enables JSON persistence and fast resume. Individual torrents may use their own absolute destination. Torrent metadata inspection uses rqbit's `list_only` mode, so the confirmation flow sees real metadata and does not create a fake download.
 
+Media playback uses a loopback-only HTTP range server on a random port with a per-launch unguessable path token. Requests are backed by rqbit's `FileStream`, which waits for and prioritises missing pieces, allowing native WebKit audio/video playback and seeking before a torrent is complete without exposing arbitrary filesystem paths.
+
 ## Storage and recovery
 
 - Torrent session: application data directory `/session`, maintained by rqbit

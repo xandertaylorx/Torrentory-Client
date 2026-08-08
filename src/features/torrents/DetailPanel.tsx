@@ -1,12 +1,15 @@
-import { Copy, Folder, Pause, Play, X } from "lucide-react";
+import { Copy, Folder, Pause, Play, PlayCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { bytes, progress, statusLabel } from "../../lib/format";
 import { torrentDetails } from "../../lib/api";
+import { mediaKind, subtitlesFor } from "../../lib/media";
 import type { TorrentDetails, TorrentItem } from "../../lib/types";
+import { MediaPlayer } from "./MediaPlayer";
 
 export function DetailPanel({ item, onClose, onPause, onResume }: { item: TorrentItem; onClose: () => void; onPause: () => void; onResume: () => void }) {
   const [details, setDetails] = useState<TorrentDetails | null>(null);
   const [tab, setTab] = useState<"files" | "trackers" | "peers">("files");
+  const [playingFile, setPlayingFile] = useState<number | null>(null);
   useEffect(() => { torrentDetails(item.id).then(setDetails).catch(() => setDetails(null)); }, [item.id, item.stats.progress_bytes, item.stats.uploaded_bytes, item.stats.state]);
   const pct = progress(item.stats.progress_bytes, item.stats.total_bytes);
   const paused = item.stats.state === "paused";
@@ -24,7 +27,13 @@ export function DetailPanel({ item, onClose, onPause, onResume }: { item: Torren
       <div className="location-block"><Folder size={15} /><span><small>Save location</small><strong>{item.output_folder}</strong></span><button aria-label="Copy save location" onClick={() => navigator.clipboard.writeText(item.output_folder)}><Copy size={14} /></button></div>
       <div className="detail-tabs" role="tablist">{(["files", "trackers", "peers"] as const).map((name) => <button key={name} className={tab === name ? "active" : ""} onClick={() => setTab(name)}>{name}</button>)}</div>
       <div className="detail-tab-content">
-        {tab === "files" && (details?.files?.map((file, index) => <div className="detail-file" key={`${file.name}-${index}`}><span>{file.name}</span><small>{bytes(file.length)}</small></div>) ?? <p className="muted">Loading files…</p>)}
+        {tab === "files" && (details?.files?.map((file, index) => {
+          const kind = mediaKind(file.name);
+          return <div className={`detail-file ${kind ? "playable" : ""}`} key={`${file.name}-${index}`}>
+            {kind && <button className="file-play" disabled={!file.included} onClick={() => setPlayingFile(index)} aria-label={`Play ${file.name}`}><PlayCircle size={15} /></button>}
+            <span>{file.name}</span><small>{bytes(file.length)}</small>
+          </div>;
+        }) ?? <p className="muted">Loading files…</p>)}
         {tab === "trackers" && (details?.trackers?.length ? details.trackers.map((tracker) => <div className="detail-file" key={tracker}><span>{tracker}</span></div>) : <p className="muted">Tracker details are not available yet.</p>)}
         {tab === "peers" && (
           <div>
@@ -49,5 +58,6 @@ export function DetailPanel({ item, onClose, onPause, onResume }: { item: Torren
       </div>
     </div>
     <footer className="detail-footer"><button className="button full" onClick={paused ? onResume : onPause}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? (item.stats.finished ? "Resume seeding" : "Resume") : (item.stats.finished ? "Pause seeding" : "Pause")}</button></footer>
+    {playingFile !== null && details?.files?.[playingFile] && <MediaPlayer torrentId={item.id} torrentName={item.name} file={details.files[playingFile]} fileId={playingFile} subtitles={subtitlesFor(details.files, details.files[playingFile])} torrentState={item.stats.state} onResume={onResume} onClose={() => setPlayingFile(null)} />}
   </aside>;
 }

@@ -15,6 +15,7 @@ use super::{
 
 pub struct RqbitEngine {
     api: Api,
+    media_base_url: String,
 }
 
 impl RqbitEngine {
@@ -35,8 +36,11 @@ impl RqbitEngine {
             ..Default::default()
         };
         let session = Session::new_with_opts(default_downloads, options).await?;
+        let api = Api::new(session, None);
+        let media_base_url = crate::media_stream::start(api.clone()).await?;
         Ok(Self {
-            api: Api::new(session, None),
+            api,
+            media_base_url,
         })
     }
 
@@ -210,5 +214,12 @@ impl TorrentEngine for RqbitEngine {
             .unwrap_or_default();
         details["trackers"] = json!(trackers);
         Ok(details)
+    }
+
+    fn media_stream_url(&self, id: usize, file_id: usize) -> anyhow::Result<String> {
+        self.api
+            .torrent_file_mime_type(TorrentIdOrHash::Id(id), file_id)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        Ok(format!("{}/{id}/{file_id}", self.media_base_url))
     }
 }

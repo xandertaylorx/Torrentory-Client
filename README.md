@@ -11,6 +11,7 @@ Working in the first vertical slice:
 - Choose a destination and included files before downloading
 - Start real BitTorrent transfers through `librqbit`
 - Live progress, download/upload speeds, and ETA through Tauri events
+- In-app audio and video streaming while files download, with waveform visualization, seeking, playback speed, volume, fullscreen video, and SRT/WebVTT subtitles
 - Pause, resume, remove, and remove with downloaded files
 - Reveal downloads in Finder and copy a magnet URI
 - Persistent torrent session with fast resume after restart

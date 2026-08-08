@@ -14,6 +14,8 @@ export const resumeTorrent = (id: number) => invoke("resume_torrent", { id });
 export const removeTorrent = (id: number, deleteFiles: boolean) =>
   invoke("remove_torrent", { id, deleteFiles });
 export const torrentDetails = (id: number) => invoke<TorrentDetails>("torrent_details", { id });
+export const mediaStreamUrl = (id: number, fileId: number) =>
+  invoke<string>("media_stream_url", { id, fileId });
 export const getSettings = () => invoke<Settings>("get_settings");
 export const saveSettings = (settings: Settings) => invoke("save_settings", { settings });
 

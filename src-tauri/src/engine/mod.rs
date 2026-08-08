@@ -35,6 +35,7 @@ pub trait TorrentEngine: Send + Sync {
     async fn resume(&self, id: usize) -> anyhow::Result<()>;
     async fn remove(&self, id: usize, delete_files: bool) -> anyhow::Result<()>;
     async fn details(&self, id: usize) -> anyhow::Result<Value>;
+    fn media_stream_url(&self, id: usize, file_id: usize) -> anyhow::Result<String>;
 }
 
 pub fn validate_source(source: &TorrentSource) -> anyhow::Result<()> {

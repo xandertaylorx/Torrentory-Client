@@ -60,6 +60,15 @@ pub async fn torrent_details(id: usize, state: State<'_, AppState>) -> Result<Va
 }
 
 #[tauri::command]
+pub fn media_stream_url(
+    id: usize,
+    file_id: usize,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    state.engine.media_stream_url(id, file_id).map_err(message)
+}
+
+#[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Settings {
     state.settings.get()
 }
