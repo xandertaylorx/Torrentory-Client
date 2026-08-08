@@ -10,7 +10,7 @@ import { CreateTorrentModal } from "./features/torrents/CreateTorrentModal";
 import { MediaPlayer } from "./features/torrents/MediaPlayer";
 import { TorrentRow } from "./features/torrents/TorrentRow";
 import { SettingsModal } from "./features/settings/SettingsModal";
-import { getDefaultClientStatus, getSettings, listTorrents, makeDefaultTorrentClient, pauseTorrent, removeTorrent, resumeTorrent, saveSettings, torrentDetails } from "./lib/api";
+import { getDefaultClientStatus, getSettings, listTorrents, makeDefaultTorrentClient, pauseTorrent, removeTorrent, resumeTorrent, saveSettings, takePendingOpenSources, torrentDetails } from "./lib/api";
 import { mediaKind, subtitlesFor } from "./lib/media";
 import type { DefaultClientStatus, Settings, TorrentDetails, TorrentFile, TorrentItem, TorrentSource } from "./lib/types";
 import { dragWindow } from "./lib/window";
@@ -55,9 +55,16 @@ export default function App() {
     if (!isTauri) return () => removeEventListener("keydown", keyboard);
     void refresh(); void getSettings().then(setSettings); void getDefaultClientStatus().then(setDefaultClient).catch(() => undefined);
     const unlistenSnapshot = listen<{ torrents: TorrentItem[] }>("torrentory://snapshot", ({ payload }) => setItems(payload.torrents));
-    const unlistenSource = listen<string>("torrentory://open-source", ({ payload }) => {
-      setIncoming({ kind: payload.startsWith("magnet:") ? "magnet" : "file", value: payload }); setAddOpen(true);
-    });
+    const importPendingSource = async () => {
+      const sources = await takePendingOpenSources();
+      const source = sources[sources.length - 1];
+      if (source) {
+        setIncoming({ kind: source.startsWith("magnet:") ? "magnet" : "file", value: source });
+        setAddOpen(true);
+      }
+    };
+    const unlistenSource = listen("torrentory://open-source-available", () => void importPendingSource());
+    void unlistenSource.then(() => importPendingSource()).catch((error) => setToast(String(error)));
     const unlistenDrop = getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "drop") {
         const path = event.payload.paths.find((candidate) => candidate.toLowerCase().endsWith(".torrent"));
@@ -148,7 +155,7 @@ export default function App() {
       <footer className="statusbar"><span><i className={items.some((item) => item.stats.state === "live") ? "online" : ""} /> {items.some((item) => item.stats.state === "live") ? "Connected" : "Ready"}</span><span>{items.filter((item) => item.stats.state === "live").length} active</span></footer>
     </main>
     {selectedItem && <DetailPanel item={selectedItem} onClose={() => setSelected(null)} onPlayFile={(details, file, fileId) => playFile(selectedItem, details, file, fileId)} onPause={() => void mutate(() => pauseTorrent(selectedItem.id))} onResume={() => void mutate(() => resumeTorrent(selectedItem.id))} />}
-    {addOpen && settings && <AddTorrentModal initialSource={incoming} defaultDestination={settings.downloadLocation} onClose={() => { setAddOpen(false); setIncoming(null); }} onAdded={refresh} />}
+    {addOpen && settings && <AddTorrentModal key={incoming?.value ?? "manual"} initialSource={incoming} defaultDestination={settings.downloadLocation} onClose={() => { setAddOpen(false); setIncoming(null); }} onAdded={refresh} />}
     {createOpen && <CreateTorrentModal onClose={() => setCreateOpen(false)} onCreated={setToast} />}
     {settingsOpen && settings && <SettingsModal value={settings} defaultClient={defaultClient} onDefaultClientChange={setDefaultClient} valueMakingDefault={makingDefault} onMakingDefaultChange={setMakingDefault} onToast={setToast} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
     {playback && <MediaPlayer torrentId={playback.item.id} torrentName={playback.item.name} file={playback.file} fileId={playback.fileId} playlist={playback.details.files.map((file, fileId) => ({ file, fileId })).filter(({ file }) => file.included && mediaKind(file.name))} subtitles={subtitlesFor(playback.details.files, playback.file)} torrentState={playback.item.stats.state} onSelect={(file, fileId) => playFile(playback.item, playback.details, file, fileId)} onResume={() => void mutate(() => resumeTorrent(playback.item.id))} onClose={() => setPlayback(null)} />}

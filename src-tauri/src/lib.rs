@@ -2,6 +2,7 @@ mod commands;
 mod default_client;
 pub mod engine;
 mod media_stream;
+mod open_sources;
 pub mod storage;
 mod torrent_creator;
 
@@ -10,6 +11,7 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use engine::{rqbit::RqbitEngine, TorrentEngine};
 use storage::settings::SettingsStore;
 use tauri::{Emitter, Manager};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_notification::NotificationExt;
 
 pub struct AppState {
@@ -20,16 +22,15 @@ pub struct AppState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
-            for arg in argv {
-                if arg.starts_with("magnet:") || arg.ends_with(".torrent") {
-                    let _ = app.emit("torrentory://open-source", arg);
-                }
-            }
+        .manage(open_sources::OpenSourceState::default())
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+            // With the `deep-link` feature, magnet URLs are forwarded through the
+            // deep-link listener. Plain .torrent paths still arrive here.
+            open_sources::enqueue(
+                app,
+                argv.into_iter().filter(|arg| !arg.starts_with("magnet:")),
+                Some(std::path::Path::new(&cwd)),
+            );
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
@@ -38,6 +39,20 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .setup(|app| {
+            let handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                open_sources::enqueue(&handle, event.urls().iter().map(|url| url.as_str()), None);
+            });
+            let startup_cwd = std::env::current_dir().ok();
+            open_sources::enqueue(
+                app.handle(),
+                std::env::args().skip(1),
+                startup_cwd.as_deref(),
+            );
+            if let Some(urls) = app.deep_link().get_current()? {
+                open_sources::enqueue(app.handle(), urls.iter().map(|url| url.as_str()), None);
+            }
+
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
             let settings = Arc::new(SettingsStore::load(data_dir.join("settings.json"))?);
@@ -114,6 +129,7 @@ pub fn run() {
             commands::save_settings,
             commands::get_default_client_status,
             commands::make_default_torrent_client,
+            open_sources::take_pending_open_sources,
         ]);
 
     builder

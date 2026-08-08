@@ -47,7 +47,7 @@ export function AddTorrentModal({ initialSource, defaultDestination, onClose, on
       <div className="input-with-icon"><Link2 size={15} /><input id="magnet" autoFocus value={magnet} onChange={(e) => setMagnet(e.target.value)} placeholder="magnet:?xt=urn:btih:…" onKeyDown={(e) => e.key === "Enter" && magnet && inspect({ kind: "magnet", value: magnet })} /></div>
       <button className="button primary full" disabled={!magnet.trim() || loading} onClick={() => inspect({ kind: "magnet", value: magnet })}>{loading ? <LoaderCircle className="spin" size={15} /> : null} Continue</button>
       <div className="or"><span>or</span></div>
-      <button className="file-choice" onClick={chooseFile}><span><File size={19} /></span><div><strong>Open a torrent file</strong><small>Choose a .torrent file from your Mac</small></div></button>
+      <button className="file-choice" onClick={chooseFile}><span><File size={19} /></span><div><strong>Open a torrent file</strong><small>Choose a .torrent file from your computer</small></div></button>
       {error && <p className="error-banner">{error}</p>}
     </div> : <>
       <div className="modal-body review-body">

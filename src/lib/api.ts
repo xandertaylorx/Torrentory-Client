@@ -25,3 +25,5 @@ export const getDefaultClientStatus = () =>
   invoke<DefaultClientStatus>("get_default_client_status");
 export const makeDefaultTorrentClient = () =>
   invoke<DefaultClientStatus>("make_default_torrent_client");
+export const takePendingOpenSources = () =>
+  invoke<string[]>("take_pending_open_sources");
