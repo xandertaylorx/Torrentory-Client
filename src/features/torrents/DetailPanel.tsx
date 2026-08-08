@@ -7,7 +7,7 @@ import type { TorrentDetails, TorrentItem } from "../../lib/types";
 export function DetailPanel({ item, onClose, onPause, onResume }: { item: TorrentItem; onClose: () => void; onPause: () => void; onResume: () => void }) {
   const [details, setDetails] = useState<TorrentDetails | null>(null);
   const [tab, setTab] = useState<"files" | "trackers" | "peers">("files");
-  useEffect(() => { torrentDetails(item.id).then(setDetails).catch(() => setDetails(null)); }, [item.id, item.stats.progress_bytes]);
+  useEffect(() => { torrentDetails(item.id).then(setDetails).catch(() => setDetails(null)); }, [item.id, item.stats.progress_bytes, item.stats.uploaded_bytes, item.stats.state]);
   const pct = progress(item.stats.progress_bytes, item.stats.total_bytes);
   const paused = item.stats.state === "paused";
   return <aside className="detail-panel" aria-label="Torrent details">
@@ -48,6 +48,6 @@ export function DetailPanel({ item, onClose, onPause, onResume }: { item: Torren
         )}
       </div>
     </div>
-    <footer className="detail-footer"><button className="button full" disabled={item.stats.finished} onClick={paused ? onResume : onPause}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? "Resume" : "Pause"}</button></footer>
+    <footer className="detail-footer"><button className="button full" onClick={paused ? onResume : onPause}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? (item.stats.finished ? "Resume seeding" : "Resume") : (item.stats.finished ? "Pause seeding" : "Pause")}</button></footer>
   </aside>;
 }

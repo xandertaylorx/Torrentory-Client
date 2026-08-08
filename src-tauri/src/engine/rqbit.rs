@@ -167,10 +167,7 @@ impl TorrentEngine for RqbitEngine {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
-        let live = peer_stats
-            .get("live")
-            .and_then(Value::as_u64)
-            .unwrap_or(0);
+        let live = peer_stats.get("live").and_then(Value::as_u64).unwrap_or(0);
 
         let connecting = peer_stats
             .get("connecting")
@@ -182,10 +179,7 @@ impl TorrentEngine for RqbitEngine {
             .and_then(Value::as_u64)
             .unwrap_or(0);
 
-        let seen = peer_stats
-            .get("seen")
-            .and_then(Value::as_u64)
-            .unwrap_or(0);
+        let seen = peer_stats.get("seen").and_then(Value::as_u64).unwrap_or(0);
 
         details["stats"] = stats_value;
         details["peer_summary"] = json!({

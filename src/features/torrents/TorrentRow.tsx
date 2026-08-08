@@ -15,9 +15,10 @@ export function TorrentRow({ item, selected, onSelect, onPause, onResume, onRemo
     addEventListener("mousedown", close); return () => removeEventListener("mousedown", close);
   }, []);
   const pct = progress(item.stats.progress_bytes, item.stats.total_bytes);
-  const active = item.stats.state === "live" && !item.stats.finished;
-  const speed = item.stats.live?.download_speed.human_readable ?? "—";
-  const eta = item.stats.live?.time_remaining?.human_readable ?? (item.stats.finished ? "Complete" : "—");
+  const active = item.stats.state === "live";
+  const seeding = item.stats.finished && active;
+  const speed = seeding ? item.stats.live?.upload_speed.human_readable : item.stats.live?.download_speed.human_readable;
+  const eta = item.stats.finished ? (active ? "Uploading" : "Complete") : (item.stats.live?.time_remaining?.human_readable ?? "—");
   return <article className={`torrent-row ${selected ? "selected" : ""}`} onClick={onSelect} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onSelect()}>
     <div className="row-primary">
       <div className={`status-mark ${item.stats.finished ? "complete" : item.stats.state}`} aria-hidden="true">
@@ -34,8 +35,8 @@ export function TorrentRow({ item, selected, onSelect, onPause, onResume, onRemo
         <span style={{ width: `${pct}%` }} />
       </div>
     </div>
-    <div className="row-speed"><span>↓</span> {active ? speed : "—"}</div>
-    <button className="icon-button row-action" onClick={(e) => { e.stopPropagation(); active ? onPause() : onResume(); }} aria-label={active ? "Pause torrent" : "Resume torrent"} disabled={item.stats.finished}>
+    <div className={`row-speed ${seeding ? "uploading" : ""}`}><span>{seeding ? "↑" : "↓"}</span> {active ? (speed ?? "—") : "—"}</div>
+    <button className="icon-button row-action" onClick={(e) => { e.stopPropagation(); active ? onPause() : onResume(); }} aria-label={active ? (item.stats.finished ? "Pause seeding" : "Pause torrent") : (item.stats.finished ? "Resume seeding" : "Resume torrent")}>
       {active ? <Pause size={15} /> : <Play size={15} />}
     </button>
     <div className="menu-wrap" ref={menuRef}>
