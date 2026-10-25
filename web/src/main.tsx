@@ -31,15 +31,26 @@ const features = [
   ["Private by default", "No account, no telemetry and no remote-control API. Nothing leaves your machine except peer traffic."],
 ];
 
+/** First sentence of the release notes with Markdown removed. */
+function firstSentence(markdown: string) {
+  const paragraph = markdown.split(/\n\s*\n/).find(block => block.trim() && !block.trim().startsWith("```")) ?? "";
+  const plain = paragraph.replace(/[*_`#>]/g, "").replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/\s+/g, " ").trim();
+  return (plain.match(/^.+?[.!?](\s|$)/)?.[0] ?? plain).trim();
+}
+
 function App() {
   const [copied, setCopied] = useState(false);
   const commandRef = useRef<HTMLElement>(null);
   const [version, setVersion] = useState("0.1.8");
+  const [note, setNote] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     fetch("https://api.github.com/repos/xandertaylorx/Torrentory-Client/releases/latest", { signal: controller.signal })
       .then(response => { if (!response.ok) throw new Error("Release unavailable"); return response.json(); })
-      .then(data => { if (typeof data.tag_name === "string" && /^v\d+\.\d+\.\d+$/.test(data.tag_name)) setVersion(data.tag_name.slice(1)); })
+      .then(data => { if (typeof data.tag_name === "string" && /^v\d+\.\d+\.\d+$/.test(data.tag_name)) {
+        setVersion(data.tag_name.slice(1));
+        if (typeof data.body === "string") setNote(firstSentence(data.body));
+      } })
       .catch(() => { /* Stable download URLs work when the API is unavailable. */ });
     return () => controller.abort();
   }, []);
@@ -69,6 +80,7 @@ function App() {
 
     <main id="main">
       <section className="mx-auto max-w-[1080px] px-6 pt-20 pb-14 text-center md:pt-28">
+        {note && <a href={`${REPO}/releases/latest`} className="mx-auto mb-8 flex w-fit max-w-[min(100%,24rem)] items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--panel)] py-1 pr-3 pl-1 text-xs text-[var(--muted)] hover:border-[color-mix(in_srgb,var(--line)_50%,var(--fg))]"><span className="shrink-0 rounded-full bg-[var(--soft)] px-2 py-0.5 font-medium text-[var(--fg)]">v{version}</span><span className="truncate">{note}</span><ArrowUpRight size={12} className="shrink-0" /></a>}
         <h1 className="mx-auto max-w-[17ch] text-[clamp(2.5rem,6.2vw,4.75rem)] leading-[1.02] font-semibold tracking-[-.05em]">The torrent client with nothing to upgrade.</h1>
         <p className="mx-auto mt-6 max-w-[34rem] text-balance text-[17px] leading-7 text-[var(--muted)]">Other clients charge for the speed your connection already has. Torrentory is free, open source and uncapped. No Pro tier, no ads, no catch.</p>
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -148,7 +160,7 @@ function App() {
 
     <footer className="rule">
       <div className="mx-auto flex max-w-[1080px] flex-col justify-between gap-4 px-6 py-8 text-xs text-[var(--muted)] sm:flex-row sm:items-center">
-        <span>© Torrentory · Download and share content you have permission to use.</span>
+        <span>© Torrentory · Download and share content you have permission to use. · Built by <span style={{ fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 800 }} className="text-[var(--fg)]">Crooli</span></span>
         <div className="flex gap-5"><a href={REPO} className="hover:text-[var(--fg)]">GitHub</a><a href={`${REPO}/blob/main/LICENSE`} className="hover:text-[var(--fg)]">MIT License</a><a href={`${REPO}/blob/main/SECURITY.md`} className="hover:text-[var(--fg)]">Security</a></div>
       </div>
     </footer>
