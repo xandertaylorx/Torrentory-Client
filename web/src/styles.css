@@ -1,30 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #fafafa;
-  --panel: #fff;
-  --fg: #111;
-  --muted: #6b6b6b;
-  --line: #e5e5e5;
-  --soft: #f2f2f2;
-  --signal: #10b981;
-  color-scheme: light;
-}
-.dark {
-  --bg: #090909;
-  --panel: #111;
-  --fg: #f5f5f5;
-  --muted: #929292;
-  --line: #2a2a2a;
-  --soft: #181818;
-  --signal: #35d699;
+  --bg: #07080a;
+  --panel: #0e1013;
+  --raised: #14171b;
+  --fg: #f4f5f6;
+  --muted: #8b9098;
+  --faint: #5b6068;
+  --line: #1d2025;
+  --line-strong: #2b2f36;
+  --accent: #c8ff4d;
+  --accent-ink: #0b0d05;
+  --danger: #ff6b5b;
   color-scheme: dark;
 }
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
-  --font-sans: "Helvetica Neue", Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, monospace;
+  --color-accent: var(--accent);
+  --font-sans: "Geist", "Helvetica Neue", Helvetica, sans-serif;
+  --font-mono: "Geist Mono", "SFMono-Regular", Consolas, monospace;
 }
 * {
   box-sizing: border-box;
@@ -36,20 +31,13 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: "Helvetica Neue", Helvetica, sans-serif;
-}
-html:not([data-nsfw="enabled"]) [data-nsfw-content="true"] {
-  display: none !important;
-}
-button,
-a,
-input,
-select,
-textarea {
-  -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
 }
 button,
 a {
+  -webkit-tap-highlight-color: transparent;
   transition:
     color 0.16s,
     background-color 0.16s,
@@ -62,43 +50,69 @@ a:active {
   transform: translateY(1px);
 }
 :focus-visible {
-  outline: 2px solid var(--fg);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: none;
-}
 ::selection {
-  background: var(--fg);
-  color: var(--bg);
-}
-.grid-bg {
-  background-image:
-    linear-gradient(var(--line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: linear-gradient(to bottom, black, transparent);
-}
-.dot-bg {
-  background-image: radial-gradient(var(--line) 0.8px, transparent 0.8px);
-  background-size: 12px 12px;
-}
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-}
-.eyebrow {
-  font:
-    600 10px/1 "SFMono-Regular",
-    monospace;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .mono {
-  font-family: "SFMono-Regular", monospace;
+  font-family: var(--font-mono);
+}
+.display {
+  font-weight: 600;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+}
+.hero-glow {
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgb(200 255 77 / 0.13), transparent 70%),
+    radial-gradient(40% 40% at 85% 30%, rgb(120 160 255 / 0.07), transparent 70%);
+}
+.fade-lines {
+  background-image: linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: calc(100% / 6) 100%;
+  mask-image: linear-gradient(to bottom, black 10%, transparent 75%);
+}
+.card {
+  background: linear-gradient(180deg, var(--raised), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+.strike {
+  position: relative;
+  color: var(--faint);
+}
+.strike::after {
+  content: "";
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  top: 54%;
+  height: 0.08em;
+  background: var(--danger);
+  transform: rotate(-2deg);
+  border-radius: 99px;
+}
+.marquee {
+  mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+}
+.marquee-track {
+  animation: marquee 38s linear infinite;
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.live-dot {
+  animation: pulse 1.8s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
 }
 .torrentory-mark path {
   transform-box: fill-box;
