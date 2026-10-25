@@ -21,7 +21,7 @@ function App() {
   });
   const [copyState, setCopyState] = useState("");
   const commandRef = useRef<HTMLElement>(null);
-  const [release, setRelease] = useState({ version: "0.1.7", date: "", notes: "" });
+  const [release, setRelease] = useState({ version: "0.1.8", date: "", notes: "" });
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     try { localStorage.setItem("torrentory-theme", dark ? "dark" : "light"); } catch { /* Storage may be disabled. */ }
