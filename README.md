@@ -39,7 +39,7 @@ Working in the first vertical slice:
 - Persistent settings, light/dark/system appearance, native file dialogs, notifications, single instance, deep links, and restored window state
 - Minimal detail view for files, trackers, peer state, transfer totals, ratio, and location
 
-Speed-limit fields and incoming-connection settings are persisted, but changing engine rate limits at runtime is not yet wired. Changing the listening port takes effect after restart. Relocating an already-started torrent and dock progress remain planned. macOS Apple Silicon and Windows x64 installers are available on GitHub Releases.
+Global download and upload limits apply immediately when settings are saved. Changing the listening port takes effect after restart. Relocating an already-started torrent and dock progress remain planned. macOS Apple Silicon and Windows x64 installers are available on GitHub Releases.
 
 ## Architecture
 

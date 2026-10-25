@@ -14,7 +14,8 @@
 
 - [ ] Menu-bar/tray background lifecycle
 - [ ] Dock/taskbar progress and native application menu
-- [ ] Runtime bandwidth limits and per-torrent basic limits
+- [x] Runtime global bandwidth limits
+- [ ] Per-torrent basic limits
 - [ ] Move completed or paused torrent data safely
 - [ ] Richer tracker and peer summaries
 - [ ] Per-file priority levels after start
