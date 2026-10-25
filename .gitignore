@@ -14,3 +14,7 @@ src-tauri/target/
 # IDE files
 .vscode/
 .idea/
+
+# Local release packaging
+/release-assets/
+*.tsbuildinfo

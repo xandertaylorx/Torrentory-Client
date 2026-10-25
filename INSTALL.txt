@@ -1,7 +1,16 @@
-From the Torrentory-Client project root:
+Torrentory Client installation
 
-  tar -xzf ~/Downloads/Torrentory-default-client-feature.tar.gz -C .
-  npm run tauri build
+macOS 12+ / Apple Silicon (recommended):
+  curl -fsSL https://github.com/xandertaylorx/Torrentory-Client/releases/latest/download/install.sh | /bin/bash
 
-The build updates Cargo.lock for the two macOS-only Core Foundation dependencies.
-Install the rebuilt DMG from src-tauri/target/release/bundle/dmg/.
+The installer verifies SHA-256, the Apple publisher signature, and Gatekeeper acceptance.
+It installs to ~/Applications without sudo and keeps macOS security settings enabled.
+Quit a running copy before updating. Open the app from Finder after installation.
+
+Manual macOS or Windows x64 installation:
+  https://github.com/xandertaylorx/Torrentory-Client/releases/latest
+
+macOS: open the DMG and drag Torrentory Client into Applications.
+Windows: run the x64 installer. It is unsigned.
+
+Source and release maintenance: README.md and RELEASE.md.

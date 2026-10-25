@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-windows:
@@ -43,10 +43,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path windows-release | Out-Null
           Copy-Item $installer.FullName "windows-release/Torrentory-Client_${version}_x64-setup.exe"
 
-      - name: Attach installer to GitHub release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $version = (Get-Content package.json | ConvertFrom-Json).version
-          gh release upload "v$version" windows-release/*.exe --clobber
+      - name: Save installer for release preparation
+        uses: actions/upload-artifact@v4
+        with:
+          name: torrentory-windows-x64
+          path: windows-release/*.exe
+          if-no-files-found: error

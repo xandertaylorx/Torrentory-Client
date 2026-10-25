@@ -1,6 +1,25 @@
 # Torrentory Client
 
-Torrentory Client is a minimal native BitTorrent client for macOS, built as the desktop companion to Torrentory. It uses Tauri, React, TypeScript, Rust, and the real `librqbit` engine. The application is content-neutral and intended for downloading and distributing content you are authorised to access.
+Torrentory Client is a minimal native BitTorrent client for macOS, distributed alongside its standalone download website in `web/`. It uses Tauri, React, TypeScript, Rust, and the real `librqbit` engine. The application is content-neutral and intended for downloading and distributing content you are authorised to access.
+
+## Install
+
+Download the latest macOS Apple Silicon DMG or Windows x64 installer from [GitHub Releases](https://github.com/xandertaylorx/Torrentory-Client/releases/latest).
+
+Recommended for macOS 12+ on Apple Silicon:
+
+```sh
+curl -fsSL https://github.com/xandertaylorx/Torrentory-Client/releases/latest/download/install.sh | /bin/bash
+```
+
+The installer checks the checksum and Apple developer signature, requires Gatekeeper acceptance, and installs to `~/Applications` without sudo. The macOS release is signed and notarised. Windows installers are unsigned. Intel Mac and Linux packages are not currently available.
+
+## Repository layout
+
+- Root, `src/`, `src-tauri/`: the desktop client.
+- `web/`: the client-only marketing and download site. See [website setup](web/README.md).
+- `scripts/`: macOS installation and release packaging.
+- [RELEASE.md](RELEASE.md): distribution and release maintenance.
 
 ## Current feature status
 
@@ -18,11 +37,11 @@ Working in the first vertical slice:
 - Persistent settings, light/dark/system appearance, native file dialogs, notifications, single instance, deep links, and restored window state
 - Minimal detail view for files, trackers, peer state, transfer totals, ratio, and location
 
-Speed-limit fields and incoming-connection settings are persisted, but changing engine rate limits at runtime is not yet wired. Changing the listening port takes effect after restart. Relocating an already-started torrent, dock progress, signed/notarised distribution, and Windows packaging remain planned.
+Speed-limit fields and incoming-connection settings are persisted, but changing engine rate limits at runtime is not yet wired. Changing the listening port takes effect after restart. Relocating an already-started torrent and dock progress remain planned. macOS Apple Silicon and Windows x64 installers are available on GitHub Releases.
 
 ## Architecture
 
-The React UI invokes a narrow typed Tauri command layer. Commands depend on the `TorrentEngine` trait rather than rqbit directly. `RqbitEngine` embeds one native `librqbit::Session`; there is no localhost HTTP server. The session stores metadata and fast-resume state under the application data directory and emits a serialized snapshot every 750 ms. Settings use an atomic temporary-file-and-rename write.
+The React UI invokes a narrow typed Tauri command layer. Commands depend on the `TorrentEngine` trait rather than rqbit directly. `RqbitEngine` embeds one native `librqbit::Session`; there is no localhost control API. Media playback uses a token-protected loopback stream. The session stores metadata and fast-resume state under the application data directory and emits a serialized snapshot every 750 ms. Settings use an atomic temporary-file-and-rename write.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) and [SECURITY.md](./SECURITY.md).
 
@@ -39,7 +58,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) and [SECURITY.md](./SECURITY.md).
 ## Development
 
 ```bash
-cd /Users/user/Developer/TESTS/Torrentory-Client
+cd Torrentory-Client
 npm install
 npm run tauri dev
 ```
@@ -57,12 +76,12 @@ cargo test --manifest-path src-tauri/Cargo.toml
 ## Build the macOS app
 
 ```bash
-cd /Users/user/Developer/TESTS/Torrentory-Client
+cd Torrentory-Client
 npm install
 npm run tauri build
 ```
 
-Unsigned local output is written under `src-tauri/target/release/bundle/macos/` and the DMG under `src-tauri/target/release/bundle/dmg/`. Public distribution requires an Apple Developer identity, signing, and notarisation.
+Local output is written under `src-tauri/target/release/bundle/macos/` and the DMG under `src-tauri/target/release/bundle/dmg/`. The published macOS release is signed and notarised; future builds must also be signed and notarised before distribution. See [RELEASE.md](RELEASE.md).
 
 ## Legal manual test
 
@@ -89,6 +108,6 @@ TORRENTORY_TEST_TORRENT=/absolute/path/to/legal-linux.iso.torrent \
 - Runtime global/per-torrent bandwidth enforcement is planned.
 - Peer data is deliberately summarized rather than presented as a dense utility table.
 - Background-only tray behavior and dock progress need a later macOS integration pass.
-- Windows configuration is kept portable, but Windows packaging and file-association testing are not complete.
+- Windows x64 installers are available, but are unsigned. Verify file associations on Windows when preparing a release.
 
 See [ROADMAP.md](./ROADMAP.md) for the next milestones.
