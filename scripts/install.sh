@@ -21,8 +21,8 @@ staged_app=''
 backup_app=''
 destination=''
 stage_dir=''
-installer_privileges=()
-run_install() { "${installer_privileges[@]}" "$@"; }
+needs_admin=false
+run_install() { if [ "$needs_admin" = true ]; then /usr/bin/sudo "$@"; else "$@"; fi; }
 cleanup() {
   if [ "$mounted" = true ]; then /usr/bin/hdiutil detach "$work_dir/volume" -quiet || true; fi
   if [ -n "$staged_app" ] && [ -d "$staged_app" ]; then run_install /bin/rm -rf "$staged_app"; fi
@@ -66,7 +66,7 @@ if [ ! -d "$install_dir" ]; then /bin/mkdir -p "$install_dir" || fail "Could not
 if [ ! -w "$install_dir" ]; then
   printf 'macOS requires administrator permission to install in %s.\n' "$install_dir"
   /usr/bin/sudo -v </dev/tty || fail "Administrator permission is required to install in $install_dir."
-  installer_privileges=(/usr/bin/sudo)
+  needs_admin=true
 fi
 destination="$install_dir/Torrentory Client.app"
 [ ! -L "$destination" ] || fail "Refusing to replace an application symlink."
