@@ -31,7 +31,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build x64 NSIS installer
+      - name: Build x64 NSIS installer and signed updater
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npm run tauri -- build --bundles nsis
 
       - name: Normalize installer filename
@@ -41,11 +44,14 @@ jobs:
           $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
           if (-not $installer) { throw "Tauri did not produce an NSIS installer" }
           New-Item -ItemType Directory -Force -Path windows-release | Out-Null
+          $signature = "$($installer.FullName).sig"
+          if (-not (Test-Path $signature)) { throw "Updater signing did not produce a signature" }
           Copy-Item $installer.FullName "windows-release/Torrentory-Client_${version}_x64-setup.exe"
+          Copy-Item $signature "windows-release/Torrentory-Client_${version}_x64-setup.exe.sig"
 
       - name: Save installer for release preparation
         uses: actions/upload-artifact@v4
         with:
           name: torrentory-windows-x64
-          path: windows-release/*.exe
+          path: windows-release/*
           if-no-files-found: error

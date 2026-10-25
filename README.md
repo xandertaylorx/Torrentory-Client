@@ -12,7 +12,9 @@ Recommended for macOS 12+ on Apple Silicon:
 curl -fsSL https://github.com/xandertaylorx/Torrentory-Client/releases/latest/download/install.sh | /bin/bash
 ```
 
-The installer checks the checksum and Apple developer signature, requires Gatekeeper acceptance, and installs to `~/Applications` without sudo. The macOS release is signed and notarised. Windows installers are unsigned. Intel Mac and Linux packages are not currently available.
+The installer checks the checksum and Apple developer signature, checks Gatekeeper acceptance for notarised releases, and installs to `/Applications`. The macOS release is Developer ID signed and is not notarised. Windows installers are unsigned. Intel Mac and Linux packages are not currently available.
+
+Updates are checked on launch. When one is available, choose **Update and restart** in the popup; the app downloads, verifies, installs and restarts itself. A manual **Check for updates** button is in the status bar. Version 0.1.7 requires one reinstall to gain the updater. macOS may ask for administrator permission when Applications is not writable.
 
 ## Repository layout
 
@@ -81,7 +83,7 @@ npm install
 npm run tauri build
 ```
 
-Local output is written under `src-tauri/target/release/bundle/macos/` and the DMG under `src-tauri/target/release/bundle/dmg/`. The published macOS release is signed and notarised; future builds must also be signed and notarised before distribution. See [RELEASE.md](RELEASE.md).
+Local output is written under `src-tauri/target/release/bundle/macos/` and the DMG under `src-tauri/target/release/bundle/dmg/`. New macOS releases use Developer ID signing without notarisation, plus a separate signing key for in-app updates. See [RELEASE.md](RELEASE.md).
 
 ## Legal manual test
 

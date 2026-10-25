@@ -26,8 +26,12 @@ Do not include private tracker credentials, magnet links, downloaded filenames, 
 
 ## Release checklist
 
-Before public distribution, run `npm audit`, `cargo audit` (installed separately), TypeScript checks, Clippy, unit tests, macOS signing/notarisation, and a legal end-to-end restart test.
+Before public distribution, run `npm audit`, `cargo audit` (installed separately), TypeScript checks, Clippy, unit tests, macOS code signing, and a legal end-to-end restart test.
 
 ## Installer and website
 
-The static `web/` site has no catalogue, account system, database, or upload endpoint. Download links point to GitHub Releases. The macOS installer checks SHA-256, pins the Apple developer team and bundle identifier, checks the app version, and requires Gatekeeper acceptance. It does not remove quarantine attributes or change macOS security settings. See [RELEASE.md](RELEASE.md).
+The static `web/` site has no catalogue, account system, database, or upload endpoint. Download links point to GitHub Releases. The macOS installer checks SHA-256, pins the Apple developer team and bundle identifier, checks the app version, and checks Gatekeeper for notarised releases. It does not remove quarantine attributes or change macOS security settings. See [RELEASE.md](RELEASE.md).
+
+## In-app updates
+
+Version 0.1.8 and later check the GitHub Releases `updater.json` endpoint on launch. Tauri validates update artifacts with an embedded public key before installing them. The signing private key lives outside the repository and in the repository's GitHub Actions secret, never in the app or website. Only the main window can invoke updater and restart commands. Updates require a newer version and an explicit Update and restart click. Failed downloads or signatures do not restart the app. Notarisation is not performed for new builds; Developer ID signing and updater signatures are retained.

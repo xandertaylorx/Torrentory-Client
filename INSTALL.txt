@@ -3,8 +3,8 @@ Torrentory Client installation
 macOS 12+ / Apple Silicon (recommended):
   curl -fsSL https://github.com/xandertaylorx/Torrentory-Client/releases/latest/download/install.sh | /bin/bash
 
-The installer verifies SHA-256, the Apple publisher signature, and Gatekeeper acceptance.
-It installs to ~/Applications without sudo and keeps macOS security settings enabled.
+The installer verifies SHA-256 and the Apple publisher signature.
+It installs to /Applications and keeps macOS security settings enabled.
 Quit a running copy before updating. Open the app from Finder after installation.
 
 Manual macOS or Windows x64 installation:

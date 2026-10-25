@@ -1,56 +1,56 @@
-# Distribution
+# Distribution and updates
 
-The desktop client lives at the repository root; the standalone website lives in `web/`. The original torrent catalogue is not included.
+The desktop client lives at the repository root; the standalone Vercel website lives in `web/`. GitHub Releases hosts downloads and update metadata.
 
-## Current release
+## Build and publish a release
 
-The initial website/installer update reuses the original v0.1.7 binaries from this repository. Their desktop source is commit `02fafd98d615cf8149b2803f63889d1593e35322`. The macOS DMG has a valid stapled notarisation ticket and its application is signed by **Developer ID Application: Xander Taylor (7XX5D66UT5)**. The Windows build is unsigned.
-
-The original asset names remain available for existing users. Added stable aliases are byte-for-byte copies:
-
-- `Torrentory-Client-macos-arm64.dmg`
-- `Torrentory-Client-windows-x64.exe`
-
-`latest.json`, `SHA256SUMS` and `install.sh` are also attached to the release. Installers always use a version-specific DMG URL after reading `latest.json`, so a newly published release cannot change the download halfway through an install.
-
-## Prepare another release
-
-1. Update the version in `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, and `web/package.json` / `web/package-lock.json`. Update the website's fallback version in `web/src/main.tsx`.
-2. Run desktop checks and `npm ci --prefix web && npm run build --prefix web`.
-3. Build a macOS Apple Silicon DMG with your Developer ID identity and Apple notarisation credentials using Tauri's [macOS signing instructions](https://v2.tauri.app/distribute/sign/macos/). Never commit credentials or certificates. The existing Developer ID team is `7XX5D66UT5`.
-4. Build a Windows x64 NSIS installer on Windows (`npm ci && npm run tauri -- build --bundles nsis`), or run the manual **Build Windows installer** workflow and download its artifact. Smoke-test the result on Windows.
-5. On macOS, prepare the release directory:
+1. Update the desktop version in `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json`.
+2. Run `npm test`, `npm run build`, Rust checks/tests, and `npm run build --prefix web`.
+3. Build the Apple Silicon macOS app with Developer ID signing and the existing updater private key:
 
    ```sh
-   node scripts/prepare-release.mjs /absolute/path/to/client.dmg /absolute/path/to/setup.exe
+   APPLE_SIGNING_IDENTITY='Developer ID Application: Xander Taylor (7XX5D66UT5)' \
+   TAURI_SIGNING_PRIVATE_KEY="$HOME/.tauri/torrentory-client-updater.key" \
+   TAURI_SIGNING_PRIVATE_KEY_PASSWORD='' npm run tauri -- build
    ```
 
-   Preparation rejects a DMG unless its notarisation ticket, publisher signature, Gatekeeper assessment and app version pass. It generates stable filenames, `latest.json`, `SHA256SUMS` and a copy of the installer. The Windows binary must be supplied from the corresponding version's build.
-6. Commit and push the matching source. Create a **draft** release with all files in `release-assets/`, review it, then publish it. For example:
+   New builds are **not notarised**. Do not supply Apple notarisation credentials. The DMG is Developer ID signed, and the `.app.tar.gz` is separately signed for Tauri's updater. Keep the private key backed up securely: replacing it strands existing installations on the old key.
+4. Push the matching source to `main`, run **Build Windows installer** in Actions, and download its `torrentory-windows-x64` artifact. The workflow uses the `TAURI_SIGNING_PRIVATE_KEY` repository secret. It produces the versioned `.exe` and adjacent `.exe.sig`. The Windows installer does not have an Authenticode signature; its Tauri updater signature is mandatory.
+5. Prepare assets on macOS, supplying installers from the same source/version:
 
    ```sh
-   gh release create vVERSION release-assets/* --draft --title 'Torrentory Client VERSION' --notes-file /path/to/release-notes.md
+   node scripts/prepare-release.mjs /path/to/client.dmg /path/to/Torrentory-Client_VERSION_x64-setup.exe '/path/to/Torrentory Client.app.tar.gz'
+   ```
+
+   Both updater signatures must exist beside their artifacts. Preparation checks the macOS publisher and version. If a DMG has a stapled notarisation ticket, it also requires Gatekeeper acceptance and marks `notarized: true`; otherwise the manifest explicitly records `false`.
+6. Verify the updater signatures using the embedded key:
+
+   ```sh
+   cargo run --manifest-path src-tauri/Cargo.toml --example verify_update -- /path/to/update-artifact
+   ```
+
+   Run this for both the `.app.tar.gz` and `.exe`; each must have an adjacent `.sig`.
+7. Create a draft release with the matching source commit and **all** files in `release-assets/`, then publish only when uploads and checks have completed:
+
+   ```sh
+   gh release create vVERSION release-assets/* --draft --target COMMIT --title 'Torrentory Client VERSION' --notes-file /path/to/notes.md
    gh release edit vVERSION --draft=false --latest
    ```
 
-   Substitute the actual version. Do not publish a release before all its assets are uploaded. GitHub's `/releases/latest/download/` links follow the latest published stable release; tags and assets must agree.
+`latest.json` serves the curl installer; `updater.json` uses Tauri's `darwin-aarch64` and `windows-x86_64` platform keys and contains updater signatures and version-specific asset URLs. Keep the two manifests separate. `SHA256SUMS` covers every distributed file. Never publish a partial release.
 
-## macOS installer
-
-The recommended command is:
+## Installation
 
 ```sh
 curl -fsSL https://github.com/xandertaylorx/Torrentory-Client/releases/latest/download/install.sh | /bin/bash
 ```
 
-The installer requires macOS 12+ on Apple Silicon, verifies SHA-256, pins the Apple developer team and bundle identifier, and requires Gatekeeper to accept the application. It installs to `~/Applications/Torrentory Client.app` without sudo. Quit the running client before an update. To choose another writable absolute directory, run a downloaded script with `TORRENTORY_INSTALL_DIR=/path/to/Applications /bin/bash install.sh`.
+The macOS installer verifies SHA-256, the Developer ID publisher (`7XX5D66UT5`) and bundle identifier, and the version. It installs to `/Applications/Torrentory Client.app`. Administrator permission is requested only if that folder is not writable; network downloads and signature checks happen without elevation. A verified duplicate from the earlier `~/Applications` installer is moved to Trash after successful installation. Quit a running client before reinstalling.
 
-For a verification-only run without installing:
+For test installs, use `TORRENTORY_INSTALL_DIR=/absolute/writable/path /bin/bash scripts/install.sh`. Use `--check` to download and verify without installing. The installer never removes quarantine or disables Gatekeeper. A build without notarisation can still trigger a macOS warning, especially when downloaded in a browser.
 
-```sh
-/bin/bash scripts/install.sh --check
-```
+## In-app updates
 
-The installer does not remove quarantine, disable Gatekeeper, or automatically launch the application. macOS can still show its normal first-launch confirmation. Direct DMG installation uses the same signed, notarised build. Signing and notarisation—not curl alone—provide Apple's trusted distribution checks: [Apple's guidance](https://support.apple.com/en-us/102445).
+Version 0.1.8 checks once on launch and shows **Update and restart** when a newer release exists. Download progress is displayed; Tauri verifies the update signature before replacing the app and restarting. Active transfers briefly pause across the restart. Offline launch failures do not interrupt the app; **Check for updates** allows manual retry. Installation failures leave a retry action, and a failed restart can be retried without reinstalling.
 
-The checksum detects corruption and mismatched assets; the publisher signature independently checks the macOS signing identity. The installer script and release metadata still depend on trusting this GitHub repository and its maintainers.
+The original 0.1.7 build has no updater, so those users must install 0.1.8 once. Subsequent versions use the in-app flow. On locked-down machines macOS may require its standard administrator prompt to replace an application in `/Applications`.
