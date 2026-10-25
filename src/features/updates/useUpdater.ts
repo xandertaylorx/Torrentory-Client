@@ -10,6 +10,7 @@ export function useUpdater(enabled: boolean) {
   const [open, setOpen] = useState(false);
   const [update, setUpdate] = useState<Update | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
+  const [bytes, setBytes] = useState({ done: 0, total: 0 });
   const [error, setError] = useState("");
   const startupCheck = useRef<Promise<Update | null> | null>(null);
   const busy = useRef(false);
@@ -56,12 +57,13 @@ export function useUpdater(enabled: boolean) {
     busy.current = true; setError("");
     try {
       if (!installed.current) {
-        setPhase("downloading"); setProgress(null);
+        setPhase("downloading"); setProgress(null); setBytes({ done: 0, total: 0 });
         let downloaded = 0, total = 0;
         await pending.current!.downloadAndInstall(event => {
           if (!mounted.current) return;
           if (event.event === "Started") { total = event.data.contentLength ?? 0; downloaded = 0; }
           if (event.event === "Progress") downloaded += event.data.chunkLength;
+          setBytes({ done: downloaded, total });
           if (event.event === "Finished") { setPhase("installing"); setProgress(100); }
           else if (total > 0) setProgress(Math.min(100, Math.round(downloaded / total * 100)));
         }, { timeout: 600_000 });
@@ -80,6 +82,6 @@ export function useUpdater(enabled: boolean) {
   }
 
   const working = phase === "downloading" || phase === "installing" || phase === "restarting";
-  return { phase, open, update, progress, error, working, installed: installed.current,
+  return { phase, open, update, progress, bytes, error, working, installed: installed.current,
     checkNow, install, dismiss: () => { if (!busy.current) setOpen(false); } };
 }

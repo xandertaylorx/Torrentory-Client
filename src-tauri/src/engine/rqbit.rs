@@ -9,7 +9,7 @@ use librqbit::{
 use serde_json::{json, Value};
 
 use super::{
-    map_torrent_status, validate_destination, validate_source, AddRequest, SourceKind,
+    kbps_to_bps, map_torrent_status, validate_destination, validate_source, AddRequest, SourceKind,
     TorrentEngine, TorrentSource,
 };
 
@@ -214,6 +214,12 @@ impl TorrentEngine for RqbitEngine {
             .unwrap_or_default();
         details["trackers"] = json!(trackers);
         Ok(details)
+    }
+
+    fn set_speed_limits(&self, download_kbps: u64, upload_kbps: u64) {
+        let limits = &self.api.session().ratelimits;
+        limits.set_download_bps(kbps_to_bps(download_kbps));
+        limits.set_upload_bps(kbps_to_bps(upload_kbps));
     }
 
     fn media_stream_url(&self, id: usize, file_id: usize) -> anyhow::Result<String> {

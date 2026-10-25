@@ -36,6 +36,14 @@ pub trait TorrentEngine: Send + Sync {
     async fn remove(&self, id: usize, delete_files: bool) -> anyhow::Result<()>;
     async fn details(&self, id: usize) -> anyhow::Result<Value>;
     fn media_stream_url(&self, id: usize, file_id: usize) -> anyhow::Result<String>;
+    /// Applies global speed limits in KB/s. Zero means unlimited. Takes effect immediately.
+    fn set_speed_limits(&self, download_kbps: u64, upload_kbps: u64);
+}
+
+/// Converts a KB/s setting to bytes per second for the rate limiter; zero is unlimited.
+pub fn kbps_to_bps(kbps: u64) -> Option<std::num::NonZeroU32> {
+    let bps = kbps.saturating_mul(1024).min(u64::from(u32::MAX));
+    std::num::NonZeroU32::new(bps as u32)
 }
 
 pub fn validate_source(source: &TorrentSource) -> anyhow::Result<()> {
@@ -94,6 +102,14 @@ pub fn map_torrent_status(engine_state: &str, finished: bool) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn converts_kbps_limits_and_treats_zero_as_unlimited() {
+        assert_eq!(kbps_to_bps(0), None);
+        assert_eq!(kbps_to_bps(1).map(|v| v.get()), Some(1024));
+        assert_eq!(kbps_to_bps(5_000).map(|v| v.get()), Some(5_120_000));
+        assert_eq!(kbps_to_bps(u64::MAX).map(|v| v.get()), Some(u32::MAX));
+    }
 
     #[test]
     fn rejects_relative_and_traversing_destinations() {

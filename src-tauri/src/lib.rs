@@ -66,6 +66,7 @@ pub fn run() {
                 current.listening_port,
             ))?;
             let engine: Arc<dyn TorrentEngine> = Arc::new(engine);
+            engine.set_speed_limits(current.download_limit_kbps, current.upload_limit_kbps);
             app.manage(AppState {
                 engine: engine.clone(),
                 settings: settings.clone(),

@@ -33,3 +33,17 @@ it("shows an actionable retry without restarting when installation fails", async
   expect(screen.getByRole("button", { name: "Retry update" })).toBeTruthy();
   expect(native.relaunch).not.toHaveBeenCalled();
 });
+
+it("shows the version change, plain notes and download progress", async () => {
+  let report: (event: unknown) => void = () => undefined;
+  const downloadAndInstall = vi.fn().mockImplementation((callback: (event: unknown) => void) => { report = callback; return new Promise(() => undefined); });
+  native.check.mockResolvedValue({ version: "0.1.9", currentVersion: "0.1.8", body: "Now **faster**.", downloadAndInstall });
+  render(<AppUpdater />);
+  await screen.findByRole("dialog", { name: "Update Torrentory" });
+  expect(screen.getByText("0.1.8")).toBeTruthy();
+  expect(screen.getByText("Now faster.")).toBeTruthy();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Update and restart" })); });
+  act(() => { report({ event: "Started", data: { contentLength: 2_000_000 } }); report({ event: "Progress", data: { chunkLength: 1_000_000 } }); });
+  expect(screen.getByRole("progressbar", { name: "Update progress" }).getAttribute("aria-valuenow")).toBe("50");
+  expect(screen.getByText(/of 1.9 MB/)).toBeTruthy();
+});

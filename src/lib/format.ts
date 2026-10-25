@@ -16,3 +16,25 @@ export function statusLabel(item: { stats: { state: string; finished: boolean } 
   if (item.stats.state === "initializing") return "Preparing";
   return "Needs attention";
 }
+
+/** Turns GitHub release Markdown into short plain text for the update popup. */
+export function plainNotes(markdown = "", limit = 420): string {
+  const text = markdown
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/[*_`>]/g, "")
+    .split(/\n\s*\n/)
+    .map((block) => block.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n\n");
+  if (text.length <= limit) return text;
+  const cut = text.slice(0, limit);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), limit - 40)).trimEnd()}…`;
+}
+
+/** Human label for a KB/s speed limit; zero means unlimited. */
+export function limitLabel(kbps: number): string {
+  if (!Number.isFinite(kbps) || kbps <= 0) return "Unlimited";
+  return kbps >= 1024 ? `${(kbps / 1024).toFixed(kbps % 1024 === 0 ? 0 : 1)} MB/s` : `${Math.round(kbps)} KB/s`;
+}

@@ -83,7 +83,10 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
 
 #[tauri::command]
 pub fn save_settings(settings: Settings, state: State<'_, AppState>) -> Result<(), String> {
-    state.settings.save(settings).map_err(message)
+    let (download, upload) = (settings.download_limit_kbps, settings.upload_limit_kbps);
+    state.settings.save(settings).map_err(message)?;
+    state.engine.set_speed_limits(download, upload);
+    Ok(())
 }
 
 #[tauri::command]

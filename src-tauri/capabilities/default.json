@@ -16,6 +16,15 @@
     "notification:default",
     "opener:allow-reveal-item-in-dir",
     "opener:allow-open-path",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://www.torrentory.com/" },
+        { "url": "https://www.torrentory.com/**" },
+        { "url": "https://github.com/xandertaylorx/Torrentory-Client" },
+        { "url": "https://github.com/xandertaylorx/Torrentory-Client/**" }
+      ]
+    },
     "deep-link:default",
     "autostart:allow-enable",
     "autostart:allow-disable",

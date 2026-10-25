@@ -10,7 +10,7 @@ Torrent metadata and peer traffic are untrusted input.
 - `librqbit` performs its own metainfo validation and rejects traversal in torrent names and file components before filesystem storage is initialized.
 - No shell commands or arbitrary command execution are exposed.
 - Media playback uses a loopback-only HTTP stream with an unguessable per-stream token. No remote-control HTTP API is exposed.
-- Tauri permissions allow only the native dialogs, notifications, autostart state, deep links, and opening/revealing paths needed by the UI.
+- Tauri permissions allow only the native dialogs, notifications, autostart state, deep links, and opening/revealing paths needed by the UI. The only web addresses the app can open are the Torrentory website and this repository (Settings → About).
 - The production CSP limits code and resources to the bundled application and Tauri IPC.
 - Removing downloaded files is a distinct engine command with a user confirmation.
 - Settings are written atomically to reduce corruption after interruption.

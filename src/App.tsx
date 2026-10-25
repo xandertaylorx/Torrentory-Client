@@ -14,6 +14,7 @@ import { SettingsModal } from "./features/settings/SettingsModal";
 import { getDefaultClientStatus, getSettings, listTorrents, makeDefaultTorrentClient, pauseTorrent, removeTorrent, resumeTorrent, saveSettings, takePendingOpenSources, torrentDetails } from "./lib/api";
 import { mediaKind, subtitlesFor } from "./lib/media";
 import type { DefaultClientStatus, Settings, TorrentDetails, TorrentFile, TorrentItem, TorrentSource } from "./lib/types";
+import { applyAppearance } from "./lib/theme";
 import { dragWindow } from "./lib/window";
 import "./styles/app.css";
 
@@ -76,8 +77,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!settings) return;
-    const dark = settings.appearance === "dark" || (settings.appearance === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-    document.documentElement.classList.toggle("dark", dark);
+    applyAppearance(settings.appearance);
   }, [settings]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 4500); return () => clearTimeout(timer); }, [toast]);
   useEffect(() => {
