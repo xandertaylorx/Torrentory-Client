@@ -43,7 +43,7 @@ function firstSentence(markdown: string) {
 function Home() {
   const [copied, setCopied] = useState(false);
   const commandRef = useRef<HTMLElement>(null);
-  const [version, setVersion] = useState("0.1.8");
+  const [version, setVersion] = useState("0.1.9");
   const [note, setNote] = useState("");
   useEffect(() => {
     const controller = new AbortController();
