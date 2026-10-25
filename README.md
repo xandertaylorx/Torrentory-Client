@@ -111,3 +111,7 @@ TORRENTORY_TEST_TORRENT=/absolute/path/to/legal-linux.iso.torrent \
 - Windows x64 installers are available, but are unsigned. Verify file associations on Windows when preparing a release.
 
 See [ROADMAP.md](./ROADMAP.md) for the next milestones.
+
+## License
+
+Torrentory's original source code, website and scripts are licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licences.
