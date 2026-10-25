@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { ArrowUpRight, Check, Copy } from "lucide-react";
-import { LogoMark } from "./Logo";
 import { ClientPreview } from "./ClientPreview";
+import { Footer, Header } from "./Layout";
+import { DocPage, LegalPage, ReleasesPage } from "./Pages";
+import { Link, usePath } from "./router";
 import "./styles.css";
 
-const REPO = "https://github.com/xandertaylorx/Torrentory-Client";
+import { REPO } from "./Markdown";
 const DOWNLOAD = `${REPO}/releases/latest/download`;
 const DMG = `${DOWNLOAD}/Torrentory-Client-macos-arm64.dmg`;
 const EXE = `${DOWNLOAD}/Torrentory-Client-windows-x64.exe`;
@@ -38,7 +40,7 @@ function firstSentence(markdown: string) {
   return (plain.match(/^.+?[.!?](\s|$)/)?.[0] ?? plain).trim();
 }
 
-function App() {
+function Home() {
   const [copied, setCopied] = useState(false);
   const commandRef = useRef<HTMLElement>(null);
   const [version, setVersion] = useState("0.1.8");
@@ -65,22 +67,9 @@ function App() {
   }
 
   return <>
-    <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 rounded-md bg-[var(--fg)] p-3 text-[var(--bg)]">Skip to content</a>
-    <header>
-      <nav aria-label="Main navigation" className="mx-auto flex h-16 max-w-[1080px] items-center justify-between px-6">
-        <a href="#" aria-label="Torrentory home" className="torrentory-logo flex items-center gap-2 text-[15px] font-semibold tracking-[-.04em]"><LogoMark className="h-[22px] w-[22px]" /> Torrentory</a>
-        <div className="flex items-center gap-6 text-[13px] text-[var(--muted)]">
-          <a href="#why" className="hidden hover:text-[var(--fg)] sm:block">Why</a>
-          <a href="#features" className="hidden hover:text-[var(--fg)] sm:block">Features</a>
-          <a href={REPO} className="hover:text-[var(--fg)]">GitHub</a>
-          <a href="#install" className="btn btn-primary !h-8 !px-3.5 !text-[13px]">Download</a>
-        </div>
-      </nav>
-    </header>
-
-    <main id="main">
+    <>
       <section className="mx-auto max-w-[1080px] px-6 pt-20 pb-14 text-center md:pt-28">
-        {note && <a href={`${REPO}/releases/latest`} className="mx-auto mb-8 flex w-fit max-w-[min(100%,24rem)] items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--panel)] py-1 pr-3 pl-1 text-xs text-[var(--muted)] hover:border-[color-mix(in_srgb,var(--line)_50%,var(--fg))]"><span className="shrink-0 rounded-full bg-[var(--soft)] px-2 py-0.5 font-medium text-[var(--fg)]">v{version}</span><span className="truncate">{note}</span><ArrowUpRight size={12} className="shrink-0" /></a>}
+        {note && <Link href="/releases" className="mx-auto mb-8 flex w-fit max-w-[min(100%,24rem)] items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--panel)] py-1 pr-3 pl-1 text-xs text-[var(--muted)] hover:border-[color-mix(in_srgb,var(--line)_50%,var(--fg))]"><span className="shrink-0 rounded-full bg-[var(--soft)] px-2 py-0.5 font-medium text-[var(--fg)]">v{version}</span><span className="truncate">{note}</span><ArrowUpRight size={12} className="shrink-0" /></Link>}
         <h1 className="mx-auto max-w-[17ch] text-[clamp(2.5rem,6.2vw,4.75rem)] leading-[1.02] font-semibold tracking-[-.05em]">The torrent client with nothing to upgrade.</h1>
         <p className="mx-auto mt-6 max-w-[34rem] text-balance text-[17px] leading-7 text-[var(--muted)]">Other clients charge for the speed your connection already has. Torrentory is free, open source and uncapped. No Pro tier, no ads, no catch.</p>
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -156,19 +145,40 @@ function App() {
           <p className="mt-10 max-w-2xl text-xs leading-5 text-[var(--faint)]">The macOS build is Developer ID signed but not notarised, so macOS may ask you to confirm the first launch. The installer keeps Gatekeeper on. Windows builds are unsigned. Intel Macs and Linux are not packaged yet.</p>
         </div>
       </section>
-    </main>
+    </>
 
-    <footer className="rule">
-      <div className="mx-auto flex max-w-[1080px] flex-col justify-between gap-4 px-6 py-8 text-xs text-[var(--muted)] sm:flex-row sm:items-center">
-        <span>© Torrentory · Download and share content you have permission to use. · Built by <span style={{ fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 800 }} className="text-[var(--fg)]">Crooli</span></span>
-        <div className="flex gap-5"><a href={REPO} className="hover:text-[var(--fg)]">GitHub</a><a href={`${REPO}/blob/main/LICENSE`} className="hover:text-[var(--fg)]">MIT License</a><a href={`${REPO}/blob/main/SECURITY.md`} className="hover:text-[var(--fg)]">Security</a></div>
-      </div>
-    </footer>
   </>;
 }
 
 function Line({ children }: { children: ReactNode }) {
   return <span className="block whitespace-pre"><span className="text-[var(--faint)] select-none">$ </span>{children}</span>;
+}
+
+const titles: Record<string, string> = {
+  "/": "Torrentory — The torrent client with nothing to upgrade",
+  "/releases": "Releases — Torrentory",
+  "/security": "Security — Torrentory",
+  "/license": "MIT License — Torrentory",
+  "/legal": "Legal — Torrentory",
+};
+
+function App() {
+  const path = usePath();
+  useEffect(() => { document.title = titles[path] ?? titles["/"]; }, [path]);
+  let page: ReactNode;
+  switch (path) {
+    case "/releases": page = <ReleasesPage />; break;
+    case "/security": page = <DocPage file="SECURITY.md" eyebrow="Security" title="How Torrentory stays safe." intro="Controls, trust boundaries and how to report a problem." />; break;
+    case "/license": page = <DocPage file="LICENSE" plain eyebrow="License" title="MIT License." intro="Free to use, modify and distribute. Read it in full below." />; break;
+    case "/legal": page = <LegalPage />; break;
+    default: page = <Home />;
+  }
+  return <>
+    <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 rounded-md bg-[var(--fg)] p-3 text-[var(--bg)]">Skip to content</a>
+    <Header />
+    <main id="main">{page}</main>
+    <Footer />
+  </>;
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
