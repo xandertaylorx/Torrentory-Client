@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Check, FilePlus2, Plus, Search, Settings as SettingsIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppUpdater } from "./features/updates/AppUpdater";
+import { ProductTour } from "./features/tour/ProductTour";
 import { Logo } from "./components/Logo";
 import { AddTorrentModal } from "./features/torrents/AddTorrentModal";
 import { DetailPanel } from "./features/torrents/DetailPanel";
@@ -36,6 +37,7 @@ export default function App() {
   const [createOpen, setCreateOpen] = useState(false);
   const [incoming, setIncoming] = useState<TorrentSource | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const [defaultClient, setDefaultClient] = useState<DefaultClientStatus | null>(null);
   const [makingDefault, setMakingDefault] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
@@ -75,6 +77,9 @@ export default function App() {
     });
     return () => { void unlistenSnapshot.then((fn) => fn()); void unlistenSource.then((fn) => fn()); void unlistenDrop.then((fn) => fn()); removeEventListener("keydown", keyboard); };
   }, []);
+  useEffect(() => {
+    if (addOpen || createOpen || settingsOpen || playback) setTourOpen(false);
+  }, [addOpen, createOpen, settingsOpen, playback]);
   useEffect(() => {
     if (!settings) return;
     applyAppearance(settings.appearance);
@@ -148,18 +153,19 @@ export default function App() {
   };
 
   return <div className={`app-shell ${selectedItem ? "with-detail" : ""}`}>
-    <header className="titlebar" data-tauri-drag-region onMouseDown={dragWindow}><div className="traffic-space" data-tauri-drag-region /><div className="titlebar-brand" data-tauri-drag-region><Logo /></div><div className="title-actions"><button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><SettingsIcon size={16} /></button><button className="button compact" onClick={() => setCreateOpen(true)}><FilePlus2 size={14} /> Create</button><button className="button primary compact" onClick={() => { setIncoming(null); setAddOpen(true); }}><Plus size={14} /> Add torrent</button></div></header>
+    <header className="titlebar" data-tauri-drag-region onMouseDown={dragWindow}><div className="traffic-space" data-tauri-drag-region /><div className="titlebar-brand" data-tauri-drag-region><Logo /></div><div className="title-actions"><button data-tour="settings" className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="Open settings"><SettingsIcon size={16} /></button><button data-tour="create" className="button compact" onClick={() => setCreateOpen(true)}><FilePlus2 size={14} /> Create</button><button data-tour="add" className="button primary compact" onClick={() => { setIncoming(null); setAddOpen(true); }}><Plus size={14} /> Add torrent</button></div></header>
     <main className={`main-view ${showDefaultClientPrompt ? "has-default-client-banner" : ""}`}>
       {showDefaultClientPrompt && <section className="default-client-banner" aria-label="Default torrent client setup"><div className="default-client-icon"><Check size={15} /></div><div><strong>Make Torrentory your default torrent client</strong><span>Open .torrent files directly in Torrentory.</span></div><div className="default-client-actions"><button className="button quiet" onClick={() => void dismissDefaultPrompt()}>Not now</button><button className="button primary" disabled={makingDefault} onClick={() => void makeDefault()}>{makingDefault ? "Setting…" : "Make default"}</button></div></section>}
-      <div className="toolbar"><div className="segments" role="tablist">{(["all", "downloading", "completed"] as Filter[]).map((name) => <button role="tab" aria-selected={filter === name} className={filter === name ? "active" : ""} key={name} onClick={() => setFilter(name)}>{name}<span>{name === "all" ? items.length : name === "completed" ? items.filter((i) => i.stats.finished).length : items.filter((i) => !i.stats.finished && i.stats.state === "live").length}</span></button>)}</div>{items.length > 4 && <label className="search"><Search size={14} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search torrents" /></label>}</div>
-      {items.length === 0 ? <EmptyState onAdd={() => setAddOpen(true)} onPaste={async () => { const value = await navigator.clipboard.readText(); setIncoming({ kind: "magnet", value }); setAddOpen(true); }} /> : <section className="torrent-list" aria-label="Torrents">{filtered.map((item) => { const mediaCount = detailsByTorrent[item.id]?.files.filter((file) => file.included && mediaKind(file.name)).length ?? 0; return <TorrentRow key={item.id} item={item} selected={selected === item.id} mediaCount={mediaCount} loadingMedia={loadingMedia === item.id} onSelect={() => setSelected(item.id)} onPlay={() => void playTorrent(item)} onPause={() => void mutate(() => pauseTorrent(item.id))} onResume={() => void mutate(() => resumeTorrent(item.id))} onRemove={(deleteFiles) => remove(item, deleteFiles)} />; })}{filtered.length === 0 && <div className="no-results">No torrents match this view.</div>}</section>}
-      <footer className="statusbar"><AppUpdater /><span><i className={items.some((item) => item.stats.state === "live") ? "online" : ""} /> {items.some((item) => item.stats.state === "live") ? "Connected" : "Ready"}</span><span>{items.filter((item) => item.stats.state === "live").length} active</span></footer>
+      <div className="toolbar"><div className="segments" role="tablist" data-tour="filters">{(["all", "downloading", "completed"] as Filter[]).map((name) => <button role="tab" aria-selected={filter === name} className={filter === name ? "active" : ""} key={name} onClick={() => setFilter(name)}>{name}<span>{name === "all" ? items.length : name === "completed" ? items.filter((i) => i.stats.finished).length : items.filter((i) => !i.stats.finished && i.stats.state === "live").length}</span></button>)}</div>{items.length > 4 && <label className="search"><Search size={14} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search torrents" /></label>}</div>
+      {items.length === 0 ? <EmptyState onAdd={() => setAddOpen(true)} onPaste={async () => { const value = await navigator.clipboard.readText(); setIncoming({ kind: "magnet", value }); setAddOpen(true); }} /> : <section className="torrent-list" aria-label="Torrents" data-tour="library">{filtered.map((item) => { const mediaCount = detailsByTorrent[item.id]?.files.filter((file) => file.included && mediaKind(file.name)).length ?? 0; return <TorrentRow key={item.id} item={item} selected={selected === item.id} mediaCount={mediaCount} loadingMedia={loadingMedia === item.id} onSelect={() => setSelected(item.id)} onPlay={() => void playTorrent(item)} onPause={() => void mutate(() => pauseTorrent(item.id))} onResume={() => void mutate(() => resumeTorrent(item.id))} onRemove={(deleteFiles) => remove(item, deleteFiles)} />; })}{filtered.length === 0 && <div className="no-results">No torrents match this view.</div>}</section>}
+      <footer className="statusbar"><AppUpdater tourActive={tourOpen} /><span><i className={items.some((item) => item.stats.state === "live") ? "online" : ""} /> {items.some((item) => item.stats.state === "live") ? "Connected" : "Ready"}</span><span>{items.filter((item) => item.stats.state === "live").length} active</span></footer>
     </main>
     {selectedItem && <DetailPanel item={selectedItem} onClose={() => setSelected(null)} onPlayFile={(details, file, fileId) => playFile(selectedItem, details, file, fileId)} onPause={() => void mutate(() => pauseTorrent(selectedItem.id))} onResume={() => void mutate(() => resumeTorrent(selectedItem.id))} />}
     {addOpen && settings && <AddTorrentModal key={incoming?.value ?? "manual"} initialSource={incoming} defaultDestination={settings.downloadLocation} onClose={() => { setAddOpen(false); setIncoming(null); }} onAdded={refresh} />}
     {createOpen && <CreateTorrentModal onClose={() => setCreateOpen(false)} onCreated={setToast} />}
-    {settingsOpen && settings && <SettingsModal value={settings} defaultClient={defaultClient} onDefaultClientChange={setDefaultClient} valueMakingDefault={makingDefault} onMakingDefaultChange={setMakingDefault} onToast={setToast} onChange={setSettings} onClose={() => setSettingsOpen(false)} />}
+    {settingsOpen && settings && <SettingsModal value={settings} defaultClient={defaultClient} onDefaultClientChange={setDefaultClient} valueMakingDefault={makingDefault} onMakingDefaultChange={setMakingDefault} onToast={setToast} onChange={setSettings} onClose={() => setSettingsOpen(false)} onStartTour={() => setTourOpen(true)} />}
     {playback && <MediaPlayer torrentId={playback.item.id} torrentName={playback.item.name} file={playback.file} fileId={playback.fileId} playlist={playback.details.files.map((file, fileId) => ({ file, fileId })).filter(({ file }) => file.included && mediaKind(file.name))} subtitles={subtitlesFor(playback.details.files, playback.file)} torrentState={playback.item.stats.state} onSelect={(file, fileId) => playFile(playback.item, playback.details, file, fileId)} onResume={() => void mutate(() => resumeTorrent(playback.item.id))} onClose={() => setPlayback(null)} />}
+    {tourOpen && <ProductTour onClose={() => setTourOpen(false)} />}
     {toast && <div className="toast" role="alert">{toast}</div>}
   </div>;
 }

@@ -23,6 +23,15 @@ it("shows the launch popup and installs/restarts from its Update button", async 
   expect(downloadAndInstall).toHaveBeenCalledTimes(1);
 });
 
+it("defers the update dialog until a running product tour closes", async () => {
+  native.check.mockResolvedValue({ version: "0.1.10", downloadAndInstall: vi.fn() });
+  const { rerender } = render(<AppUpdater tourActive />);
+  await screen.findByRole("button", { name: "Update available" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  rerender(<AppUpdater tourActive={false} />);
+  expect(screen.getByRole("dialog", { name: "Update Torrentory" })).toBeTruthy();
+});
+
 it("shows an actionable retry without restarting when installation fails", async () => {
   const downloadAndInstall = vi.fn().mockRejectedValue(new Error("invalid signature"));
   native.check.mockResolvedValue({ version: "0.1.9", downloadAndInstall });

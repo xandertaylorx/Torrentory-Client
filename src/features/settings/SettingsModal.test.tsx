@@ -23,9 +23,9 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function open(onChange = vi.fn(), onClose = vi.fn()) {
-  render(<SettingsModal value={base} defaultClient={null} onDefaultClientChange={vi.fn()} valueMakingDefault={false} onMakingDefaultChange={vi.fn()} onToast={vi.fn()} onChange={onChange} onClose={onClose} />);
-  return { onChange, onClose };
+function open(onChange = vi.fn(), onClose = vi.fn(), onStartTour = vi.fn()) {
+  render(<SettingsModal value={base} defaultClient={null} onDefaultClientChange={vi.fn()} valueMakingDefault={false} onMakingDefaultChange={vi.fn()} onToast={vi.fn()} onChange={onChange} onClose={onClose} onStartTour={onStartTour} />);
+  return { onChange, onClose, onStartTour };
 }
 
 it("validates ports and limits", () => {
@@ -54,6 +54,21 @@ it("blocks saving an invalid port and explains why", () => {
   fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "80" } });
   expect(screen.getByRole("alert").textContent).toContain("between 1024 and 65535");
   expect((screen.getByRole("button", { name: "Save settings" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("closes settings, discards the draft and restores appearance before starting the tour", () => {
+  const { onChange, onClose, onStartTour } = open();
+  fireEvent.click(screen.getByRole("button", { name: "Appearance" }));
+  fireEvent.click(screen.getByRole("radio", { name: "dark" }));
+  expect(document.documentElement.classList.contains("dark")).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "About" }));
+  fireEvent.click(screen.getByRole("button", { name: "Run tour" }));
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(onStartTour).toHaveBeenCalledOnce();
+  expect(onClose.mock.invocationCallOrder[0]).toBeLessThan(onStartTour.mock.invocationCallOrder[0]);
+  expect(document.documentElement.classList.contains("dark")).toBe(false);
+  expect(native.save).not.toHaveBeenCalled();
+  expect(onChange).not.toHaveBeenCalled();
 });
 
 it("shows the app version in About", async () => {

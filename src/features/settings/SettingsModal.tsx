@@ -35,7 +35,7 @@ export function validateSettings(settings: Settings): string | null {
   return null;
 }
 
-export function SettingsModal({ value, defaultClient, onDefaultClientChange, valueMakingDefault, onMakingDefaultChange, onToast, onChange, onClose }: { value: Settings; defaultClient: DefaultClientStatus | null; onDefaultClientChange: (status: DefaultClientStatus) => void; valueMakingDefault: boolean; onMakingDefaultChange: (value: boolean) => void; onToast: (message: string) => void; onChange: (settings: Settings) => void; onClose: () => void }) {
+export function SettingsModal({ value, defaultClient, onDefaultClientChange, valueMakingDefault, onMakingDefaultChange, onToast, onChange, onClose, onStartTour }: { value: Settings; defaultClient: DefaultClientStatus | null; onDefaultClientChange: (status: DefaultClientStatus) => void; valueMakingDefault: boolean; onMakingDefaultChange: (value: boolean) => void; onToast: (message: string) => void; onChange: (settings: Settings) => void; onClose: () => void; onStartTour: () => void }) {
   const [section, setSection] = useState<SectionName>("General");
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -89,6 +89,7 @@ export function SettingsModal({ value, defaultClient, onDefaultClientChange, val
       {section === "Appearance" && <SettingsGroup title="Appearance" hint="Changes preview instantly."><div className="appearance-picker" role="radiogroup" aria-label="Theme">{(["system", "light", "dark"] as const).map((theme) => <button role="radio" aria-checked={draft.appearance === theme} className={draft.appearance === theme ? "active" : ""} onClick={() => update("appearance", theme)} key={theme}><span className={`theme-preview ${theme}`} />{theme}</button>)}</div></SettingsGroup>}
       {section === "About" && <SettingsGroup title="About">
         <div className="about-card"><div className="about-mark"><Logo wordmark={false} /></div><div><strong>Torrentory Client</strong><small>{version ? `Version ${version}` : "Version unavailable"} · MIT licensed</small></div><button className="button" onClick={checkForUpdates}><RefreshCw size={13} /> Check for updates</button></div>
+        <div className="tour-setting"><div><strong>New to Torrentory?</strong><small>A quick guided tour of the essentials. Unsaved settings will be discarded.</small></div><button className="button" disabled={saving} onClick={() => { cancel(); onStartTour(); }}>Run tour</button></div>
         <div className="about-links">
           <button onClick={() => void openUrl(SITE)}>Website <ArrowUpRight size={12} /></button>
           <button onClick={() => void openUrl(`${SITE}/releases`)}>Release notes <ArrowUpRight size={12} /></button>

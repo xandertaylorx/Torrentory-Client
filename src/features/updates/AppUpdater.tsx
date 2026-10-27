@@ -7,7 +7,7 @@ import { useUpdater } from "./useUpdater";
 /** Other parts of the app (for example Settings → About) ask for a manual check with this event. */
 export const CHECK_FOR_UPDATES_EVENT = "torrentory:check-for-updates";
 
-export function AppUpdater() {
+export function AppUpdater({ tourActive = false }: { tourActive?: boolean }) {
   const updater = useUpdater("__TAURI_INTERNALS__" in window);
   const { checkNow } = updater;
   useEffect(() => {
@@ -20,11 +20,11 @@ export function AppUpdater() {
   const notes = plainNotes(updater.update?.body);
   const from = updater.update?.currentVersion;
   return <>
-    <button className={`update-check ${updater.update ? "has-update" : ""}`} onClick={() => void updater.checkNow()} disabled={checking || updater.working}
+    <button data-tour="updates" className={`update-check ${updater.update ? "has-update" : ""}`} onClick={() => void updater.checkNow()} disabled={checking || updater.working}
       title={updater.update ? `Version ${updater.update.version} is ready to install` : undefined}>
       {updater.update ? <i className="update-dot" aria-hidden="true" /> : <RefreshCw size={11} className={checking ? "spin" : ""} />} {label}
     </button>
-    {updater.open && <Modal title={updater.phase === "current" ? "You're up to date" : checking ? "Checking for updates" : "Update Torrentory"}
+    {updater.open && !tourActive && <Modal title={updater.phase === "current" ? "You're up to date" : checking ? "Checking for updates" : "Update Torrentory"}
       subtitle={updater.update ? `Version ${updater.update.version} is available` : "Torrentory checks for updates each time it opens."}
       onClose={updater.dismiss} dismissible={!updater.working}>
       <div className="update-content" aria-live="polite">

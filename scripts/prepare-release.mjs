@@ -62,7 +62,7 @@ const signature = file => {
 };
 const updaterManifest = {
   version,
-  notes: 'Automatic launch-time update checks, in-app update installation and standard macOS Applications installation.',
+  notes: 'A replayable guided tour from Settings → About, with animated spotlights, keyboard navigation and reduced-motion support. Covers adding and creating torrents, filters, playback, settings and updates.',
   pub_date: new Date().toISOString(),
   platforms: {
     'darwin-aarch64': { url: `${repo}/releases/download/v${version}/Torrentory-Client-macos-arm64.app.tar.gz`, signature: signature(`${updater}.sig`) },
