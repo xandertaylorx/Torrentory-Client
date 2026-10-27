@@ -155,11 +155,11 @@ function Line({ children }: { children: ReactNode }) {
 }
 
 const titles: Record<string, string> = {
-  "/": "Torrentory — The torrent client with nothing to upgrade",
-  "/releases": "Releases — Torrentory",
-  "/security": "Security — Torrentory",
-  "/license": "MIT License — Torrentory",
-  "/legal": "Legal — Torrentory",
+  "/": "Torrentory | The torrent client with nothing to upgrade",
+  "/releases": "Releases | Torrentory",
+  "/security": "Security | Torrentory",
+  "/license": "MIT License | Torrentory",
+  "/legal": "Legal | Torrentory",
 };
 
 function App() {
