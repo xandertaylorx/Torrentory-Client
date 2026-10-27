@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { ArrowUpRight, Check, Copy } from "lucide-react";
 import { ClientPreview } from "./ClientPreview";
+import { DotShader } from "./DotShader";
 import { Footer, Header } from "./Layout";
 import { DocPage, LegalPage, ReleasesPage } from "./Pages";
 import { Link, usePath } from "./router";
@@ -117,7 +118,8 @@ function Home() {
         </div>
       </section>
 
-      <section id="install" className="rule scroll-mt-4">
+      <section id="install" className="rule dot-surface dot-fade scroll-mt-4">
+        <DotShader />
         <div className="mx-auto max-w-[1080px] px-6 py-24">
           <h2 className="text-3xl font-semibold tracking-[-.04em] sm:text-4xl">Install</h2>
           <div className="mt-10 grid gap-10 lg:grid-cols-[1.4fr_1fr] lg:gap-20">

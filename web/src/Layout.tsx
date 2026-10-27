@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { LogoMark } from "./Logo";
+import { DotShader } from "./DotShader";
 import { Link } from "./router";
 import { REPO } from "./Markdown";
 
@@ -22,7 +23,8 @@ export function Header() {
 
 export function Footer() {
   return (
-    <footer className="rule">
+    <footer className="rule dot-surface">
+      <DotShader />
       <div className="mx-auto flex max-w-[1080px] flex-col justify-between gap-4 px-6 py-8 text-xs text-[var(--muted)] md:flex-row md:items-center">
         <span>© Torrentory · Built by <a href="https://crooli.com" target="_blank" rel="noopener noreferrer" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif', fontWeight: 800 }} className="text-[var(--fg)] hover:underline">Crooli</a></span>
         <div className="flex flex-wrap gap-x-5 gap-y-2">
