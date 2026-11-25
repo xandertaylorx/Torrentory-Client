@@ -21,6 +21,7 @@ export const newChat = (id, secret, name) => ({
   id, secret, name: name || 'New chat', nameTs: 0, link: '', net: 'connecting',
   members: {}, messages: [], incoming: {}, callInfo: null, unread: 0, lastTs: 0,
   kept: false,           // I'm keeping a copy of this chat in my vault
+  ttl: 0, ttlTs: 0,      // disappearing-message timer (seconds) and when it was last changed
   keepers: {},           // mid -> true for other people who said they keep a copy
 });
 

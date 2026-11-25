@@ -38,6 +38,10 @@ const paths = {
   moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,
   more: <><circle cx="5.5" cy="12" r="1.3" fill="currentColor" /><circle cx="12" cy="12" r="1.3" fill="currentColor" /><circle cx="18.5" cy="12" r="1.3" fill="currentColor" /></>,
   save: <><path d="M12 4v10M8 10.5l4 4 4-4" /><path d="M5 15.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2.5" /></>,
+  attach: <path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.4 3.4 0 0 1 4.8 4.8L9.9 17a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4" />,
+  timer: <><circle cx="12" cy="13" r="7.5" /><path d="M12 9.5V13l2.2 1.6M9.5 3h5" /></>,
+  file: <><path d="M14 3.5H7.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8z" /><path d="M14 3.5V8h4.5" /></>,
+  download: <path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" />,
   arrowDown: <path d="M12 5v14M6 13l6 6 6-6" />,
   back: <path d="M15 5l-7 7 7 7" />,
 };

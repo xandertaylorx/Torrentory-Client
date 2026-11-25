@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useStore, useChat, setState, getState, toast } from '../lib/store.js';
-import { leaveChat, startCall, joinCall, renameChat, setProfile, setActive, openChat, burnAll, setKeep, currentProfile, saveSession } from '../lib/session.js';
+import { leaveChat, startCall, joinCall, renameChat, setProfile, setActive, openChat, burnAll, setKeep, currentProfile, saveSession, setTtl, TTL_OPTIONS } from '../lib/session.js';
 import { createVault, unlockVault, lockVault, isUnlocked } from '../lib/vault.js';
 import { shareCode, regenerateCode, answerKnock, joinWithCode, cancelJoin, shareText, looksLikeCode } from '../lib/invite.js';
 import { newRoomSecret } from '../lib/crypto.js';
@@ -25,7 +25,7 @@ export function Chat({ theme, toggleTheme }) {
   const onDrop = (e) => {
     e.preventDefault();
     setDrag(false);
-    const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
+    const files = [...e.dataTransfer.files];
     if (files.length && active) setDropped(files);
   };
 
@@ -45,7 +45,7 @@ export function Chat({ theme, toggleTheme }) {
         <StatusBar />
       </div>
       <Knocks />
-      {drag && <div className="drop-zone">Drop photos to send</div>}
+      {drag && <div className="drop-zone">Drop photos or files to send</div>}
       {lightbox && <Lightbox m={lightbox} close={() => setLightbox(null)} />}
       {sheet === 'new' && <NewChatSheet />}
       {sheet === 'invite' && <InviteSheet />}
@@ -112,7 +112,7 @@ function ChatRow({ chat, active, me }) {
   const preview = !last ? (here.length ? `${here.slice(0, 2).join(', ')}${here.length > 2 ? ` +${here.length - 2}` : ''} ${here.length === 1 ? 'is' : 'are'} here` : 'Waiting for people to join')
     : last.kind === 'system' ? last.text
     : last.deleted ? 'Message deleted'
-    : `${who}: ${last.kind === 'image' ? 'Photo' : last.kind === 'voice' ? 'Voice message' : last.text}`;
+    : `${who}: ${last.kind === 'image' ? 'Photo' : last.kind === 'voice' ? 'Voice message' : last.kind === 'file' ? last.fname || 'File' : last.text}`;
   return (
     <li>
       <button className={`chat-row ${active ? 'active' : ''}`} onClick={() => setActive(chat.id)}>
@@ -205,6 +205,7 @@ function ChatHeader() {
         <b>{name}</b>
         <span className={typers.length ? 'typing' : ''}>{sub}</span>
       </button>
+      {chat.test && <span className="test-chip" title="The Test Bot runs as a real second device inside this page">Test</span>}
       <span className="spacer" />
       <KeptChip chat={chat} />
       <button className="btn sm" onClick={() => setState({ sheet: 'invite' })}><Icon name="users" size={14} /> Invite</button>
@@ -392,6 +393,13 @@ function InfoSheet() {
           onBlur={() => name.trim() && name.trim() !== chat.name && renameChat(name.trim())}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
       </label>
+      <div className="field ttl-field"><span>Disappearing messages</span>
+        <div className="seg" role="radiogroup" aria-label="Disappearing messages">
+          {TTL_OPTIONS.map(([v, label]) => (
+            <button key={v} role="radio" aria-checked={(chat.ttl || 0) === v} className={(chat.ttl || 0) === v ? 'on' : ''} onClick={() => setTtl(v, chat.id)}>{label.replace(' minutes', ' min')}</button>
+          ))}
+        </div>
+      </div>
       <KeepSection chat={chat} />
       <div className="side-label flush">People <span>{list.length}</span></div>
       <ul className="members">

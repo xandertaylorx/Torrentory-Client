@@ -14,19 +14,24 @@ import { TunedPeerConnection, AUDIO_CONSTRAINTS, CAMERA_CONSTRAINTS, SCREEN_CONS
 export const APP_ID = 'torrentory-messenger-v1';
 const SESSION_KEY = 'torrentory.messenger.session';
 
+export const BOT = new URLSearchParams(location.search).has('bot');
+const mem = new Map();
+const store = BOT ? { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v), clear: () => mem.clear() } : sessionStorage;
+export const events = new EventTarget(); // 'message', 'peer', 'stream': used by the test bot
+
 let ident = null;          // { sk, pk, pkB64, mid }
 const conns = new Map();   // chat id -> { room, action, keys, eph, peers, bins, chains, seenSent }
 let local = { audio: null, cam: null, screen: null };
 
 // ---------- session (sessionStorage only) ----------
 export function loadSession() {
-  try { const raw = sessionStorage.getItem(SESSION_KEY); if (raw) return JSON.parse(raw); } catch {}
+  try { const raw = store.getItem(SESSION_KEY); if (raw) return JSON.parse(raw); } catch {}
   return null;
 }
 export function saveSession(patch) {
   const cur = loadSession() || { id: newIdentity(), chats: [] };
   const next = { ...cur, ...(typeof patch === 'function' ? patch(cur) : patch) };
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
+  store.setItem(SESSION_KEY, JSON.stringify(next));
   return next;
 }
 export function ensureIdentity() {
@@ -52,7 +57,7 @@ export async function startApp({ saved = [] } = {}) {
 
 export const linkFor = (secret, name) => `${location.origin}${location.pathname}#${secret}${name ? '.' + b64u(utf8(name)) : ''}`;
 
-export async function openChat({ secret, name }, { focus = true, saved = null } = {}) {
+export async function openChat({ secret, name }, { focus = true, saved = null, ephemeral = false, test = false } = {}) {
   const id = chatIdOf(secret);
   if (conns.has(id)) { if (focus) setActive(id); return id; }
   const keys = await deriveRoom(secret);
@@ -61,7 +66,9 @@ export async function openChat({ secret, name }, { focus = true, saved = null } 
   if (saved) restoreSnapshot(chat, saved, bins);
   chat.members[ident.mid] = { ...getState().me, online: true, self: true, peerIds: [], joinedAt: Date.now() };
   setState((s) => ({ chats: { ...s.chats, [id]: chat }, order: s.order.includes(id) ? s.order : [id, ...s.order] }));
-  saveSession((cur) => ({ chats: [...(cur.chats || []).filter((c) => c.secret !== secret), { secret, name: name || '' }] }));
+  if (test) chat.test = true;
+  // test chats aren't remembered: a refresh makes a fresh one with a fresh bot
+  if (!ephemeral && !test) saveSession((cur) => ({ chats: [...(cur.chats || []).filter((c) => c.secret !== secret), { secret, name: name || '' }] }));
 
   const room = joinRoom({ appId: APP_ID, password: keys.signalPassword, identity: 'none', maxReceiveBytes: 96 * 1024 * 1024, rtcPolyfill: TunedPeerConnection }, keys.roomId);
   const action = room.makeAction('x');
@@ -117,7 +124,7 @@ export async function leaveChat(id = getState().active) {
 export async function burnAll() {
   for (const id of [...conns.keys()]) await leaveChat(id);
   await deleteVault();
-  sessionStorage.clear();
+  store.clear();
   location.replace(location.pathname);
 }
 
@@ -171,11 +178,13 @@ async function onHello(c, body, peerId) {
   updateMember(c.id, mid, { pk: body.pk, online: true, peerIds, joinedAt: prev?.joinedAt || Date.now(), safety: safetyCode(ident.pk, pk), name: prev?.name || 'Someone' });
 
   for (const q of p.queue.splice(0)) await sendTo(c, peerId, q.obj, q.bin, q.opts);
+  events.dispatchEvent(new CustomEvent('peer', { detail: { chatId: c.id, mid, peerId } }));
   const st = getState();
   const chat = st.chats[c.id];
   await sendTo(c, peerId, { t: 'profile', name: st.me.name, avatar: st.me.avatar });
   await sendTo(c, peerId, { t: 'room', name: chat.name, ts: chat.nameTs });
   if (chat.kept) await sendTo(c, peerId, { t: 'keep', on: true });
+  if (chat.ttlTs) await sendTo(c, peerId, { t: 'ttl', v: chat.ttl || 0, ts: chat.ttlTs });
   for (const m of chat.messages.slice(-400)) if (!m.deleted && m.kind !== 'system') await sendTo(c, peerId, { ...wireMsg(m), h: 1 }, c.bins.get(m.id), { big: (c.bins.get(m.id)?.length || 0) > 200000 });
   if (st.call?.chat === c.id) await sendTo(c, peerId, { t: 'call', a: 'join', cid: st.call.cid, video: st.call.video, mic: st.call.mic, cam: st.call.cam, screen: st.call.screen, quiet: 1 });
 }
@@ -239,6 +248,14 @@ function handle(c, o, bin, peerId, mid) {
       if (m && m.mid === mid) { if (m.url) URL.revokeObjectURL(m.url); c.bins.delete(m.id); updateMessage(c.id, o.id, { deleted: true, text: '', url: null }); }
       break;
     }
+    case 'ttl': {
+      const v = Number(o.v) || 0;
+      if (!(o.ts > (chat.ttlTs || 0)) || !TTL_OPTIONS.some(([x]) => x === v)) break;
+      updateChat(c.id, { ttl: v, ttlTs: o.ts });
+      const who = chat.members[mid]?.name || 'Someone';
+      systemLine(c.id, v ? `${who} set messages to disappear after ${ttlLabel(v)}` : `${who} turned off disappearing messages`, 'timer');
+      break;
+    }
     case 'keep': {
       const was = !!chat.keepers[mid];
       if (!!o.on === was) break;
@@ -269,6 +286,8 @@ function onMsg(c, o, bin, fromMid) {
     id: o.id, ts: Math.min(o.ts, Date.now() + 60000), mid: o.mid, kind: o.kind, text: o.text || '', mime: o.mime, blur: !!o.blur,
     dur: o.dur, wave: o.wave, reply: o.reply, name: o.name, r: o.r || {}, verified: true, w: o.w, hgt: o.hgt, tx: typeof o.tx === 'string' ? o.tx.slice(0, 8000) : undefined,
     pk: o.pk, sig: o.sig, // kept so this message can be passed on to people who join later
+    fname: typeof o.fname === 'string' ? o.fname.slice(0, 200) : undefined,
+    ttl: Number.isFinite(o.ttl) && o.ttl > 0 ? Math.min(o.ttl, 2592000) : undefined,
 
   };
   if (bin) {
@@ -277,8 +296,10 @@ function onMsg(c, o, bin, fromMid) {
     m.size = bin.length;
   }
   if (!chat.members[o.mid]) updateMember(c.id, o.mid, { name: o.name || 'Someone', online: false, peerIds: [], pk: o.pk, safety: safetyCode(ident.pk, pk) });
+  if (m.ttl && m.ts + m.ttl * 1000 <= Date.now()) return; // already expired
   insertMessage(c.id, m, !o.h);
   if (!o.h) {
+    events.dispatchEvent(new CustomEvent('message', { detail: { chatId: c.id, m } }));
     updateMember(c.id, o.mid, { typingUntil: 0 });
     const st = getState();
     if (st.active !== c.id || document.hidden) { updateChat(c.id, (x) => ({ unread: x.unread + 1 })); blip(); }
@@ -297,13 +318,14 @@ function insertMessage(id, m, bump) {
 }
 
 // ---------- outgoing (default: the open chat) ----------
-const wireMsg = (m) => ({ t: 'msg', id: m.id, ts: m.ts, mid: m.mid, kind: m.kind, text: m.text, mime: m.mime, blur: m.blur, dur: m.dur, wave: m.wave, reply: m.reply, name: m.name, pk: m.pk, sig: m.sig, r: m.r, w: m.w, hgt: m.hgt, tx: m.tx });
+const wireMsg = (m) => ({ t: 'msg', id: m.id, ts: m.ts, mid: m.mid, kind: m.kind, text: m.text, mime: m.mime, blur: m.blur, dur: m.dur, wave: m.wave, reply: m.reply, name: m.name, pk: m.pk, sig: m.sig, r: m.r, w: m.w, hgt: m.hgt, tx: m.tx, fname: m.fname, ttl: m.ttl });
 
-export async function sendMessage({ kind = 'text', text = '', bin = null, mime, blur, dur, wave, reply, w, hgt, tx }, chatId = getState().active) {
+export async function sendMessage({ kind = 'text', text = '', bin = null, mime, blur, dur, wave, reply, w, hgt, tx, fname }, chatId = getState().active) {
   const c = conn(chatId);
   if (!c) return;
+  const ttl = getState().chats[chatId]?.ttl || undefined;
   const m = {
-    id: b64u(rand(12)), ts: Date.now(), mid: ident.mid, kind, text, mime, blur: !!blur, dur, wave, reply, w, hgt, tx: tx || undefined,
+    id: b64u(rand(12)), ts: Date.now(), mid: ident.mid, kind, text, mime, blur: !!blur, dur, wave, reply, w, hgt, tx: tx || undefined, fname: fname || undefined, ttl,
     name: getState().me.name, pk: ident.pkB64, r: {}, verified: true, status: 'sending', progress: 0,
   };
   m.sig = b64u(sign(ident.sk, messageSigBytes(m, bin)));
@@ -638,6 +660,7 @@ function onRemoteStream(c, stream, peerId, meta) {
   }
   const k = meta?.k || (stream.getVideoTracks().length ? 'cam' : 'audio');
   const mid = p.mid;
+  events.dispatchEvent(new CustomEvent('stream', { detail: { chatId: c.id, mid, kind: k, stream } }));
   setState((s) => (s.call ? { call: { ...s.call, remote: { ...s.call.remote, [mid]: { ...(s.call.remote[mid] || {}), [k]: stream } } } } : {}));
   const prune = () => {
     if (stream.getTracks().some((t) => t.readyState === 'live')) return;
@@ -683,10 +706,10 @@ function snapshot(id) {
     if (!mediaCache.has(m.id)) mediaCache.set(m.id, b64u(c.bins.get(m.id)));
     media[m.id] = mediaCache.get(m.id);
   }
-  const keepFields = ['id', 'ts', 'mid', 'kind', 'text', 'mime', 'blur', 'dur', 'wave', 'reply', 'name', 'pk', 'sig', 'r', 'w', 'hgt', 'tx', 'deleted', 'size', 'tone'];
+  const keepFields = ['id', 'ts', 'mid', 'kind', 'text', 'mime', 'blur', 'dur', 'wave', 'reply', 'name', 'pk', 'sig', 'r', 'w', 'hgt', 'tx', 'deleted', 'size', 'tone', 'fname', 'ttl'];
   const messages = chat.messages.map((m) => Object.fromEntries(keepFields.filter((k) => m[k] !== undefined).map((k) => [k, m[k]])));
   const members = Object.fromEntries(Object.values(chat.members).filter((m) => !m.self).map((m) => [m.mid, { mid: m.mid, name: m.name, avatar: m.avatar, pk: m.pk }]));
-  return { v: 1, id, secret: chat.secret, name: chat.name, nameTs: chat.nameTs, lastTs: chat.lastTs, savedAt: Date.now(), messages, members, media };
+  return { v: 1, id, secret: chat.secret, name: chat.name, nameTs: chat.nameTs, lastTs: chat.lastTs, ttl: chat.ttl || 0, ttlTs: chat.ttlTs || 0, savedAt: Date.now(), messages, members, media };
 }
 
 function restoreSnapshot(chat, snap, bins) {
@@ -694,6 +717,8 @@ function restoreSnapshot(chat, snap, bins) {
   chat.name = snap.name || chat.name;
   chat.nameTs = snap.nameTs || 0;
   chat.lastTs = snap.lastTs || 0;
+  chat.ttl = snap.ttl || 0;
+  chat.ttlTs = snap.ttlTs || 0;
   for (const [mid, m] of Object.entries(snap.members || {})) {
     let safety;
     try { safety = m.pk ? safetyCode(ident.pk, unb64u(m.pk)) : undefined; } catch {}
@@ -734,3 +759,29 @@ export function currentProfile() {
   const s = loadSession();
   return { id: s.id, name: s.name, avatar: s.avatar };
 }
+
+// ---------- disappearing messages ----------
+export const TTL_OPTIONS = [[0, 'Off'], [300, '5 minutes'], [3600, '1 hour'], [86400, '1 day'], [604800, '1 week']];
+export const ttlLabel = (v) => TTL_OPTIONS.find(([x]) => x === v)?.[1] || `${v}s`;
+
+export function setTtl(v, id = getState().active) {
+  const chat = getState().chats[id];
+  if (!chat || (chat.ttl || 0) === v) return;
+  const ts = Date.now();
+  updateChat(id, { ttl: v, ttlTs: ts });
+  systemLine(id, v ? `You set messages to disappear after ${ttlLabel(v)}` : 'You turned off disappearing messages', 'timer');
+  broadcast(conn(id), { t: 'ttl', v, ts });
+}
+
+// remove expired messages everywhere: memory, media, and (through autosave) the vault
+setInterval(() => {
+  const now = Date.now();
+  for (const chat of Object.values(getState().chats)) {
+    const gone = chat.messages.filter((m) => m.ttl && m.ts + m.ttl * 1000 <= now);
+    if (!gone.length) continue;
+    const c = conns.get(chat.id);
+    for (const m of gone) { if (m.url) URL.revokeObjectURL(m.url); c?.bins.delete(m.id); mediaCache.delete(m.id); }
+    const ids = new Set(gone.map((m) => m.id));
+    updateChat(chat.id, (x) => ({ messages: x.messages.filter((m) => !ids.has(m.id)) }));
+  }
+}, 1000);

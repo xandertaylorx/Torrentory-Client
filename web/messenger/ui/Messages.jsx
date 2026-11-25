@@ -117,6 +117,8 @@ function Message({ m, author, mine, first, last, menuOpen, setMenu, onReply, onO
     <ImageBubble m={m} onOpen={onOpenImage} />
   ) : m.kind === 'voice' ? (
     <div className="bubble voice-bubble"><VoicePlayer url={m.url} dur={m.dur} wave={m.wave} tx={m.tx} mine={mine} /></div>
+  ) : m.kind === 'file' ? (
+    <FileBubble m={m} />
   ) : (
     <div className={`bubble ${isEmojiOnly(m.text) ? 'jumbo' : ''}`}><Linkified text={m.text} /></div>
   );
@@ -129,7 +131,7 @@ function Message({ m, author, mine, first, last, menuOpen, setMenu, onReply, onO
         {replyTo && (
           <button className="quote" onClick={() => document.getElementById(`m-${replyTo.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
             <b>{members[replyTo.mid]?.name || replyTo.name}</b>
-            <span>{replyTo.deleted ? 'Message deleted' : replyTo.kind === 'image' ? 'Photo' : replyTo.kind === 'voice' ? 'Voice message' : replyTo.text.slice(0, 120)}</span>
+            <span>{replyTo.deleted ? 'Message deleted' : replyTo.kind === 'image' ? 'Photo' : replyTo.kind === 'voice' ? 'Voice message' : replyTo.kind === 'file' ? replyTo.fname || 'File' : replyTo.text.slice(0, 120)}</span>
           </button>
         )}
         <div className="bubble-wrap" onTouchStart={startPress} onTouchEnd={endPress} onTouchMove={endPress} onDoubleClick={() => !m.deleted && react(m.id, '❤️')}>
@@ -145,7 +147,9 @@ function Message({ m, author, mine, first, last, menuOpen, setMenu, onReply, onO
           {menuOpen && (
             <div className="react-pop" onClick={(e) => e.stopPropagation()}>
               {QUICK.map((e) => <button key={e} className={(m.r?.[e] || []).includes(me.mid) ? 'mine' : ''} onClick={() => { react(m.id, e); setMenu(false); }}>{e}</button>)}
-              <button className="pop-reply" onClick={() => { onReply(m); setMenu(false); }}><Icon name="reply" size={16} /></button>
+              <button className="pop-reply" onClick={() => { onReply(m); setMenu(false); }} aria-label="Reply"><Icon name="reply" size={16} /></button>
+              {m.kind === 'text' && <button className="pop-reply" onClick={() => { navigator.clipboard.writeText(m.text); toast('Copied', 'ok', 1500); setMenu(false); }} aria-label="Copy"><Icon name="copy" size={16} /></button>}
+              {mine && <button className="pop-reply pop-del" onClick={() => { deleteMessage(m.id); setMenu(false); }} aria-label="Delete for everyone"><Icon name="trash" size={16} /></button>}
             </div>
           )}
         </div>
@@ -161,6 +165,7 @@ function Message({ m, author, mine, first, last, menuOpen, setMenu, onReply, onO
         {last && (
           <div className="msg-meta">
             <span>{timeOf(m.ts)}</span>
+            {m.ttl > 0 && <Expiry m={m} />}
             {mine && !m.deleted && <Status m={m} seen={seers?.length > 0} />}
             {seers?.length > 0 && <span className="seers">{seers.slice(0, 5).map((s) => <Avatar key={s.mid} member={s} size={14} />)}</span>}
           </div>
@@ -217,6 +222,32 @@ function ImageBubble({ m, onOpen }) {
           <div className="img-progress"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" /><circle cx="18" cy="18" r="15" className="p" style={{ strokeDashoffset: 94.2 * (1 - (m.progress || 0)) }} /></svg></div>
         )}
         {m.size && <span className="img-size">{dims ? `${dims[0]}×${dims[1]} · ` : ''}{fmtSize(m.size)}</span>}
+      </div>
+      {m.text && <div className="caption"><Linkified text={m.text} /></div>}
+    </div>
+  );
+}
+
+// time left on a disappearing message
+function Expiry({ m }) {
+  const now = useNow(1000);
+  const left = Math.max(0, m.ts + m.ttl * 1000 - now) / 1000;
+  const label = left >= 86400 ? `${Math.ceil(left / 86400)}d` : left >= 3600 ? `${Math.ceil(left / 3600)}h` : left >= 60 ? `${Math.ceil(left / 60)}m` : `${Math.ceil(left)}s`;
+  return <span className="expiry" title="Disappears automatically"><Icon name="timer" size={11} />{label}</span>;
+}
+
+const extOf = (name = '') => (name.includes('.') ? name.split('.').pop().slice(0, 4).toUpperCase() : 'FILE');
+const PLAYABLE = /^video\/(mp4|webm|quicktime|ogg)$/;
+
+function FileBubble({ m }) {
+  const playable = PLAYABLE.test(m.mime || '') && m.url;
+  return (
+    <div className={`bubble file-bubble ${playable ? 'has-video' : ''}`}>
+      {playable && <video className="file-video" src={m.url} controls playsInline preload="metadata" />}
+      <div className="file-card">
+        <span className="file-ext">{extOf(m.fname)}</span>
+        <span className="file-name"><b title={m.fname}>{m.fname || 'File'}</b><small>{fmtSize(m.size || 0)}</small></span>
+        {m.url && <a className="file-dl" href={m.url} download={m.fname || 'file'} aria-label={`Download ${m.fname || 'file'}`} title="Download"><Icon name="download" size={16} /></a>}
       </div>
       {m.text && <div className="caption"><Linkified text={m.text} /></div>}
     </div>

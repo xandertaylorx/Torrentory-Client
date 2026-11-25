@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './icons.jsx';
-import { sendMessage, typing } from '../lib/session.js';
+import { sendMessage, typing, setTtl, TTL_OPTIONS } from '../lib/session.js';
 import { toast, useChat } from '../lib/store.js';
-import { VoiceRecorder, decodeAudio, waveform, prepareImage, fmtTime, startTranscriber } from '../lib/media.js';
+import { VoiceRecorder, decodeAudio, waveform, prepareImage, fmtTime, fmtSize, startTranscriber } from '../lib/media.js';
 import { LiveWave, VoicePlayer } from './Voice.jsx';
 import { Sheet } from './common.jsx';
 
@@ -10,6 +10,9 @@ export function Composer({ reply, clearReply, pendingFiles, clearFiles }) {
   const [text, setText] = useState('');
   const [rec, setRec] = useState(null); // { state: 'rec'|'review', t, levels, url, bin, dur, wave, mime }
   const [images, setImages] = useState(null);
+  const [files, setFiles] = useState(null);
+  const [timerOpen, setTimerOpen] = useState(false);
+  const ttl = useChat((c) => c.ttl || 0);
   const recorder = useRef(null);
   const scribe = useRef(null);
   const [live, setLive] = useState('');
@@ -19,7 +22,16 @@ export function Composer({ reply, clearReply, pendingFiles, clearFiles }) {
   const chatName = useChat((c) => c.name);
 
   useEffect(() => { if (reply) input.current?.focus(); }, [reply]);
-  useEffect(() => { if (pendingFiles?.length) { setImages(pendingFiles); clearFiles(); } }, [pendingFiles, clearFiles]);
+  // photos go through the photo sheet (resize, strip metadata, optional blur); everything else is sent as a file
+  const take = (list) => {
+    const imgs = list.filter((f) => /^image\/(jpeg|png|webp|gif|avif|heic|heif)$/.test(f.type));
+    const rest = list.filter((f) => !imgs.includes(f));
+    const ok = rest.filter((f) => f.size <= MAX_FILE);
+    if (ok.length < rest.length) toast(`Files can be up to ${fmtSize(MAX_FILE)} each`, 'warn');
+    if (imgs.length) setImages(imgs);
+    if (ok.length) setFiles(ok);
+  };
+  useEffect(() => { if (pendingFiles?.length) { take(pendingFiles); clearFiles(); } }, [pendingFiles, clearFiles]);
 
   // auto-grow textarea
   useEffect(() => {
@@ -27,6 +39,7 @@ export function Composer({ reply, clearReply, pendingFiles, clearFiles }) {
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = Math.min(160, el.scrollHeight) + 'px';
+    el.style.overflowY = el.scrollHeight > 160 ? 'auto' : 'hidden'; // no stray scrollbar until it's needed
   }, [text]);
 
   const send = () => {
@@ -97,8 +110,8 @@ export function Composer({ reply, clearReply, pendingFiles, clearFiles }) {
   };
 
   const onPaste = (e) => {
-    const files = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
-    if (files.length) { e.preventDefault(); setImages(files); }
+    const pasted = [...e.clipboardData.files];
+    if (pasted.length) { e.preventDefault(); take(pasted); }
   };
 
   const replyName = reply && (members[reply.mid]?.name || reply.name);
@@ -108,7 +121,7 @@ export function Composer({ reply, clearReply, pendingFiles, clearFiles }) {
       {reply && (
         <div className="reply-bar">
           <Icon name="reply" size={16} />
-          <div><b>Replying to {replyName}</b><span>{reply.kind === 'image' ? 'Photo' : reply.kind === 'voice' ? 'Voice message' : reply.text}</span></div>
+          <div><b>Replying to {replyName}</b><span>{reply.kind === 'image' ? 'Photo' : reply.kind === 'voice' ? 'Voice message' : reply.kind === 'file' ? reply.fname || 'File' : reply.text}</span></div>
           <button className="icon-btn sm" onClick={clearReply} aria-label="Cancel reply"><Icon name="x" size={16} /></button>
         </div>
       )}
@@ -116,7 +129,13 @@ export function Composer({ reply, clearReply, pendingFiles, clearFiles }) {
       <div className={`composer ${rec ? 'recording' : ''}`}>
         {!rec && (
           <>
-            <button className="icon-btn" onClick={() => fileRef.current.click()} aria-label="Send photo"><Icon name="image" /></button>
+            <button className="icon-btn" onClick={() => fileRef.current.click()} aria-label="Send a photo or file" title="Photo or file"><Icon name="attach" /></button>
+            <div className="timer-wrap">
+              <button className={`icon-btn timer-btn ${ttl ? 'on' : ''}`} onClick={() => setTimerOpen(!timerOpen)} aria-label="Disappearing messages" title="Disappearing messages">
+                <Icon name="timer" />{ttl > 0 && <span className="timer-tag">{shortTtl(ttl)}</span>}
+              </button>
+              {timerOpen && <TimerMenu value={ttl} close={() => setTimerOpen(false)} />}
+            </div>
             <textarea
               ref={input} rows={1} value={text} placeholder={`Message ${chatName}`} maxLength={8000}
               onChange={(e) => { setText(e.target.value); if (e.target.value) typing(); }}
@@ -150,8 +169,10 @@ export function Composer({ reply, clearReply, pendingFiles, clearFiles }) {
           </>
         )}
       </div>
-      <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) setImages(f); }} />
+      <input ref={fileRef} type="file" multiple hidden onChange={(e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) take(f); }} />
+      {ttl > 0 && !rec && <div className="ttl-note"><Icon name="timer" size={12} /> New messages disappear after {TTL_OPTIONS.find(([v]) => v === ttl)?.[1]}</div>}
       {images && <ImageSend files={images} onClose={() => setImages(null)} reply={reply} clearReply={clearReply} />}
+      {files && <FileSend files={files} onClose={() => setFiles(null)} reply={reply} clearReply={clearReply} />}
     </div>
   );
 }
@@ -202,6 +223,62 @@ function ImageSend({ files, onClose, reply, clearReply }) {
       <div className="row">
         <input type="text" value={caption} placeholder="Add a caption" maxLength={2000} onChange={(e) => setCaption(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !busy && send()} autoFocus />
         <button className="btn primary" disabled={busy || !items.length} onClick={send}>Send</button>
+      </div>
+    </Sheet>
+  );
+}
+
+const MAX_FILE = 50 * 1024 * 1024;
+export const shortTtl = (v) => (v >= 604800 ? '1w' : v >= 86400 ? '1d' : v >= 3600 ? '1h' : `${Math.round(v / 60)}m`);
+
+function TimerMenu({ value, close }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const off = (e) => { if (!ref.current?.contains(e.target)) close(); };
+    const esc = (e) => e.key === 'Escape' && close();
+    setTimeout(() => document.addEventListener('pointerdown', off), 0);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', off); document.removeEventListener('keydown', esc); };
+  }, [close]);
+  return (
+    <div className="timer-menu" ref={ref} role="menu">
+      <b>Disappearing messages</b>
+      <small>Applies to everyone in this chat. Everyone is told when it changes.</small>
+      {TTL_OPTIONS.map(([v, label]) => (
+        <button key={v} role="menuitemradio" aria-checked={value === v} className={value === v ? 'on' : ''} onClick={() => { setTtl(v); close(); }}>
+          {label}{value === v && <Icon name="check" size={14} />}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const extOf = (name) => (name.includes('.') ? name.split('.').pop().slice(0, 4).toUpperCase() : 'FILE');
+
+function FileSend({ files, onClose, reply, clearReply }) {
+  const [caption, setCaption] = useState('');
+  const [busy, setBusy] = useState(false);
+  const total = files.reduce((n, f) => n + f.size, 0);
+  const send = async () => {
+    setBusy(true);
+    for (const [i, f] of files.entries()) {
+      const bin = new Uint8Array(await f.arrayBuffer());
+      sendMessage({ kind: 'file', bin, mime: f.type || 'application/octet-stream', fname: f.name.slice(0, 200), text: i === files.length - 1 ? caption.trim() : '', reply: i === 0 ? reply?.id : undefined });
+    }
+    clearReply();
+    onClose();
+  };
+  return (
+    <Sheet title={files.length > 1 ? `Send ${files.length} files` : 'Send file'} onClose={onClose}>
+      <ul className="file-send">
+        {files.map((f, i) => (
+          <li key={i}><span className="file-ext">{extOf(f.name)}</span><span className="file-name"><b>{f.name}</b><small>{fmtSize(f.size)}{f.type ? ` · ${f.type}` : ''}</small></span></li>
+        ))}
+      </ul>
+      <p className="hint small">Sent directly and end-to-end encrypted{files.length > 1 ? ` · ${fmtSize(total)} total` : ''}. Files stay in the chat only as long as someone has it open.</p>
+      <div className="row">
+        <input type="text" value={caption} placeholder="Add a message" maxLength={2000} onChange={(e) => setCaption(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !busy && send()} autoFocus />
+        <button className="btn primary" disabled={busy} onClick={send}>{busy ? 'Sending…' : 'Send'}</button>
       </div>
     </Sheet>
   );

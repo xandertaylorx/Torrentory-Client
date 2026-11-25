@@ -6,6 +6,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/chat/test",
+      "destination": "/messenger.html"
+    },
+    {
       "source": "/chat",
       "destination": "/messenger.html"
     },

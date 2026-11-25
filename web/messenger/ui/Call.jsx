@@ -45,11 +45,11 @@ function RemoteAudio({ stream }) {
   return <audio ref={a} autoPlay />;
 }
 
-function Tile({ member, audio, video, mirror, mic, label, screen }) {
+function Tile({ member, audio, video, mirror, mic, label, screen, self }) {
   const ref = useRef(null);
   useLevel(audio, ref);
   return (
-    <div className={`tile ${video ? 'has-video' : ''} ${screen ? 'screen' : ''}`} ref={ref}>
+    <div className={`tile ${video ? 'has-video' : ''} ${screen ? 'screen' : ''} ${self ? 'me' : ''}`} ref={ref}>
       {video ? <Video stream={video} mirror={mirror} /> : (
         <div className="tile-av"><Avatar member={member} size={88} /></div>
       )}
@@ -109,7 +109,7 @@ export function CallOverlay() {
   }
 
   const tiles = [
-    { key: 'me', member: members[me.mid] || me, audio: local.audio, video: local.screen || local.cam, mirror: !local.screen, mic: call.mic, label: 'You', screen: !!local.screen },
+    { key: 'me', member: members[me.mid] || me, audio: local.audio, video: local.screen || local.cam, mirror: !local.screen, mic: call.mic, label: 'You', screen: !!local.screen, self: true },
     ...others.map((mid) => {
       const r = call.remote[mid] || {};
       const p = info.parts[mid] || {};
@@ -129,7 +129,7 @@ export function CallOverlay() {
         {others.length > 0 && <Quality />}
         <button className="round ghost" onClick={() => setMinimized(true)} aria-label="Minimize"><Icon name="minimize" size={18} /></button>
       </header>
-      <div className={`tiles n${Math.min(tiles.length, 6)}`}>
+      <div className={`tiles n${Math.min(tiles.length, 6)} ${tiles.length === 2 ? 'duo' : ''}`}>
         {tiles.map(({ key, ...t }) => <Tile key={key} {...t} />)}
         {others.length === 0 && <div className="waiting">Waiting for others to pick up…</div>}
       </div>

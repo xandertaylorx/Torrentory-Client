@@ -184,7 +184,11 @@ export function unpackPayload(bytes) {
 // ---------- layer 1: message signatures ----------
 export function messageSigBytes(m, bin) {
   const binHash = bin ? hex(sha256(bin)) : '';
-  return utf8(JSON.stringify(['crooli/msg/v1', m.id, m.ts, m.kind, m.text || '', m.mime || '', m.blur ? 1 : 0, m.dur || 0, m.reply || '', m.wave || [], binHash, m.mid, m.tx || '']));
+  const fields = ['crooli/msg/v1', m.id, m.ts, m.kind, m.text || '', m.mime || '', m.blur ? 1 : 0, m.dur || 0, m.reply || '', m.wave || [], binHash, m.mid, m.tx || ''];
+  // newer fields are only appended when present, so older messages keep verifying
+  if (m.fname) fields.push('fname', m.fname);
+  if (m.ttl) fields.push('ttl', m.ttl);
+  return utf8(JSON.stringify(fields));
 }
 
 // ---------- safety numbers ----------

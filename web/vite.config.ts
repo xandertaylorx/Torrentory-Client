@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 
 // /chat and /messenger serve the messenger app (messenger.html); vercel.json does the same in production.
-const MESSENGER_PATHS = /^\/(chat|messenger)\/?(\?.*)?$/;
+const MESSENGER_PATHS = /^\/(chat|messenger|chat\/test)\/?(\?.*)?$/;
 const rewrite: Connect.NextHandleFunction = (req, _res, next) => {
   if (req.url && MESSENGER_PATHS.test(req.url)) req.url = "/messenger.html";
   next();
