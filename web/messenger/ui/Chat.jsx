@@ -72,6 +72,7 @@ function ChatList({ theme, toggleTheme }) {
         <button className="icon-btn sm" onClick={toggleTheme} aria-label="Toggle theme"><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} /></button>
         <button className="btn sm square" onClick={() => setState({ sheet: 'new' })} aria-label="New chat or join" title="New chat or join with a code"><Icon name="edit" size={14} /></button>
       </div>
+      <LockedVaultRow />
       <ul className="chat-list">
         {order.map((id) => chats[id] && <ChatRow key={id} chat={chats[id]} active={id === active} me={me} />)}
         {order.length === 0 && (
@@ -89,6 +90,18 @@ function ChatList({ theme, toggleTheme }) {
         <button className="icon-btn sm" onClick={() => setState({ sheet: 'burn' })} aria-label="Burn session" title="Burn session"><Icon name="flame" size={15} /></button>
       </div>
     </aside>
+  );
+}
+
+function LockedVaultRow() {
+  const vault = useStore((s) => s.vault);
+  if (vault !== 'locked') return null;
+  return (
+    <button className="vault-locked" onClick={() => setState({ sheet: 'vault', vaultFor: null })}>
+      <Icon name="lock" size={15} />
+      <span><b>Saved chats are locked</b><small>Enter your passphrase to open them</small></span>
+      <span className="vault-locked-go">Unlock</span>
+    </button>
   );
 }
 
@@ -464,7 +477,7 @@ function VaultSheet() {
     } catch (e) { setErr(e.message || 'Something went wrong'); setBusy(false); }
   };
   return (
-    <Sheet title={unlocking ? 'Unlock saved chats' : 'Choose a passphrase'} onClose={() => setState({ sheet: 'info' })}>
+    <Sheet title={unlocking ? 'Unlock saved chats' : 'Choose a passphrase'} onClose={() => setState({ sheet: chatId ? 'info' : null })}>
       <p className="sheet-lede">{unlocking
         ? 'Enter the passphrase for the chats saved on this device.'
         : 'Saved chats are encrypted with this passphrase. You’ll need it to open them again. There is no way to recover it, so pick something you’ll remember.'}</p>
@@ -481,7 +494,7 @@ function VaultSheet() {
       )}
       {err && <p className="form-err">{err}</p>}
       <div className="row end">
-        <button className="btn" onClick={() => setState({ sheet: 'info' })}>Cancel</button>
+        <button className="btn" onClick={() => setState({ sheet: chatId ? 'info' : null })}>Cancel</button>
         <button className="btn primary" disabled={busy || !pass} onClick={submit}>{busy ? 'Working…' : unlocking ? 'Unlock' : 'Save and keep this chat'}</button>
       </div>
     </Sheet>
