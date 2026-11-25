@@ -623,6 +623,8 @@ button.head-text:hover { background: var(--soft); }
 .react-pop .pop-del { color: var(--danger); }
 
 /* ---------- one-to-one calls: them full screen, you in a corner ---------- */
+.tiles.gallery { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 8px; }
+.tiles.gallery .tile { flex: none; transition: width .25s var(--ease), height .25s var(--ease), border-color .15s; }
 .tiles.duo { display: block; }
 .tiles.duo .tile { position: absolute; inset: 12px; }
 .tiles.duo .tile:not(.me) video { object-fit: contain; background: #000; } /* show the whole picture, whatever its shape */

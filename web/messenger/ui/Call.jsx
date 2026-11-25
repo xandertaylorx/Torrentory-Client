@@ -45,11 +45,11 @@ function RemoteAudio({ stream }) {
   return <audio ref={a} autoPlay />;
 }
 
-function Tile({ member, audio, video, mirror, mic, label, screen, self }) {
+function Tile({ member, audio, video, mirror, mic, label, screen, self, size }) {
   const ref = useRef(null);
   useLevel(audio, ref);
   return (
-    <div className={`tile ${video ? 'has-video' : ''} ${screen ? 'screen' : ''} ${self ? 'me' : ''}`} ref={ref}>
+    <div className={`tile ${video ? 'has-video' : ''} ${screen ? 'screen' : ''} ${self ? 'me' : ''}`} ref={ref} style={size}>
       {video ? <Video stream={video} mirror={mirror} /> : (
         <div className="tile-av"><Avatar member={member} size={88} /></div>
       )}
@@ -78,6 +78,42 @@ function Quality() {
     <span className={`call-quality ${q.quality}`} title={`${label}${q.loss ? ` · ${(q.loss * 100).toFixed(1)}% loss` : ''}`}>
       <i /><i /><i />{res}{q.ms} ms
     </span>
+  );
+}
+
+// Zoom/Meet-style gallery: measure the call area, try every column count, and keep the one that
+// gives the biggest tiles at a fixed shape (16:9, or 4:3 on portrait screens). Rows are centred, so
+// an uneven last row (3 + 2, or 2 + 2 + 1) sits neatly in the middle. Two people use the
+// one-to-one layout instead (them full screen, you in a corner).
+function Gallery({ count, duo, children }) {
+  const ref = useRef(null);
+  const [box, setBox] = useState(null);
+  useEffect(() => {
+    const measure = () => { const r = ref.current?.getBoundingClientRect(); if (r) setBox({ w: r.width - 24, h: r.height - 24 }); };
+    const ro = new ResizeObserver(measure);
+    ro.observe(ref.current);
+    addEventListener('orientationchange', measure);
+    return () => { ro.disconnect(); removeEventListener('orientationchange', measure); };
+  }, []);
+  let size;
+  if (!duo && box?.w) {
+    // landscape screens keep video's own 16:9; tall phone screens may also use 4:3 or square tiles,
+    // whichever makes the picture biggest
+    const gap = 8, ratios = box.h > box.w ? [16 / 9, 4 / 3, 1] : [16 / 9];
+    let best = { area: 0 };
+    for (const ratio of ratios) {
+      for (let cols = 1; cols <= count; cols++) {
+        const rows = Math.ceil(count / cols);
+        const w = Math.min((box.w - gap * (cols - 1)) / cols, ((box.h - gap * (rows - 1)) / rows) * ratio);
+        if (w > 0 && w * (w / ratio) > best.area) best = { area: w * (w / ratio), w, ratio };
+      }
+    }
+    size = { width: Math.floor(best.w), height: Math.floor(best.w / best.ratio) };
+  }
+  return (
+    <div ref={ref} className={`tiles ${duo ? 'duo' : 'gallery'}`}>
+      {children(size)}
+    </div>
   );
 }
 
@@ -129,10 +165,14 @@ export function CallOverlay() {
         {others.length > 0 && <Quality />}
         <button className="round ghost" onClick={() => setMinimized(true)} aria-label="Minimize"><Icon name="minimize" size={18} /></button>
       </header>
-      <div className={`tiles n${Math.min(tiles.length, 6)} ${tiles.length === 2 ? 'duo' : ''}`}>
-        {tiles.map(({ key, ...t }) => <Tile key={key} {...t} />)}
-        {others.length === 0 && <div className="waiting">Waiting for others to pick up…</div>}
-      </div>
+      <Gallery count={tiles.length} duo={tiles.length === 2}>
+        {(size) => (
+          <>
+            {tiles.map(({ key, ...t }) => <Tile key={key} {...t} size={size} />)}
+            {others.length === 0 && <div className="waiting">Waiting for others to pick up…</div>}
+          </>
+        )}
+      </Gallery>
       <footer className="call-controls">
         <button className={`round ${call.mic ? '' : 'off'}`} onClick={toggleMic} aria-label={call.mic ? 'Mute' : 'Unmute'}><Icon name={call.mic ? 'mic' : 'micOff'} /></button>
         <button className={`round ${call.cam ? '' : 'off'}`} onClick={toggleCam} aria-label="Camera"><Icon name={call.cam ? 'video' : 'videoOff'} /></button>

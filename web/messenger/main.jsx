@@ -31,7 +31,7 @@ async function boot() {
 }
 
 // /chat/test: fresh test chats whose other members are bots, each running as a real separate
-// participant in its own hidden iframe: a 1:1 Test Bot, and a Test Group with three bots
+// participant in its own hidden iframe: a 1:1 Test Bot, and a Test Group with four bots (five people with you)
 function spawnBot(secret, params) {
   const frame = document.createElement('iframe');
   frame.src = `${location.pathname}?bot=1&${new URLSearchParams(params)}#${secret}`;
@@ -48,7 +48,7 @@ async function bootTest() {
   if (getState().phase !== 'app') await startApp();
   const group = newRoomSecret();
   await openChat({ secret: group, name: 'Test Group' }, { test: true, focus: false });
-  ['Ava', 'Kai', 'Noor'].forEach((name, idx) => spawnBot(group, { name, group: 1, idx, count: 3 }));
+  ['Ava', 'Kai', 'Noor', 'Theo'].forEach((name, idx) => spawnBot(group, { name, group: 1, idx, count: 4 }));
   const solo = newRoomSecret();
   await openChat({ secret: solo, name: 'Test Bot' }, { test: true });
   spawnBot(solo, { name: 'Test Bot' });

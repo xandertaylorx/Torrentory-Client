@@ -52,14 +52,17 @@ function testPattern() {
     x.fillStyle = 'rgba(255,255,255,.75)';
     for (let i = 0; i < 64; i++) x.fillRect(40 * k + i * 6 * k, 40 * k, 1, 24 * k);
     x.fillStyle = '#fff';
+    x.textAlign = OPTS.group ? 'center' : 'left';
+    const tx = OPTS.group ? W / 2 : 40 * k;
     x.font = `600 ${64 * k * (OPTS.group ? 1.6 : 1)}px Geist, system-ui, sans-serif`;
-    x.fillText(OPTS.name, 40 * k, 150 * k * (OPTS.group ? 1.15 : 1));
+    x.fillText(OPTS.name, tx, OPTS.group ? 130 : 150 * k);
     x.font = `500 ${120 * k}px "Geist Mono", ui-monospace, monospace`;
     const d = new Date();
-    x.fillText(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}.${String(Math.floor(d.getMilliseconds() / 100))}`, 40 * k, 300 * k);
+    x.fillText(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}.${String(Math.floor(d.getMilliseconds() / 100))}`, tx, OPTS.group ? 205 : 300 * k);
     x.font = `400 ${28 * k * (OPTS.group ? 1.4 : 1)}px "Geist Mono", ui-monospace, monospace`;
     x.fillStyle = 'rgba(255,255,255,.7)';
-    x.fillText(OPTS.group ? `${W}×${H} · frame ${frame}` : `1280×720 · frame ${frame} · you hear yourself 1 s later`, 40 * k, 360 * k);
+    x.fillText(OPTS.group ? `${W}×${H} · frame ${frame}` : `1280×720 · frame ${frame} · you hear yourself 1 s later`, tx, OPTS.group ? 250 : 360 * k);
+    x.textAlign = 'left';
   };
   draw();
   const fps = OPTS.group ? 24 : 30;
@@ -193,7 +196,7 @@ async function makeVideo() {
   return { bin: new Uint8Array(await blob.arrayBuffer()), mime: blob.type, fname: `test-clip.${blob.type.includes('mp4') ? 'mp4' : 'webm'}` };
 }
 
-const GROUP_HELP = `This is a group with three bots: Ava, Kai and Noor. Each one is a separate participant with its own connection.
+const GROUP_HELP = `This is a group with four bots: Ava, Kai, Noor and Theo. With you that's five, so you can see how an uneven group looks. Each one is a separate participant with its own connection.
 • Send a message: one of us answers each time, taking turns
 • everyone: we all reply
 • photo, voice, video, file work here too
@@ -218,7 +221,7 @@ async function say(text, extra = {}) {
   await sendMessage({ kind: 'text', text, ...extra }, chatId);
 }
 
-const BOT_NAMES = ['Test Bot', 'Ava', 'Kai', 'Noor'];
+const BOT_NAMES = ['Test Bot', 'Ava', 'Kai', 'Noor', 'Theo'];
 const hashStr = (str) => [...str].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
 
 async function reply(m) {
@@ -227,7 +230,7 @@ async function reply(m) {
     const t = (m.text || '').trim().toLowerCase();
     if (t === 'everyone' || t === 'all') {
       await wait(400 + OPTS.idx * 900);
-      return say(`${OPTS.name} here. ${['Hearing you loud and clear.', 'All good on my end.', 'Present!'][OPTS.idx % 3]}`);
+      return say(`${OPTS.name} here. ${['Hearing you loud and clear.', 'All good on my end.', 'Present!', 'Here and listening.'][OPTS.idx % 4]}`);
     }
     if (hashStr(m.id) % OPTS.count !== OPTS.idx) return; // one bot answers each message, taking turns
   }
@@ -273,7 +276,7 @@ export async function runBot(secret) {
         if (groupGreeted) return;
         groupGreeted = true;
         if (OPTS.idx === 0) say(`Hi! ${GROUP_HELP}`);
-        else setTimeout(() => say(['', 'Hey 👋', 'Hi, Noor here.'][OPTS.idx] || 'Hi!'), 2000 + OPTS.idx * 1200);
+        else setTimeout(() => say(['', 'Hey 👋', 'Hi, Noor here.', 'Theo here, hello!'][OPTS.idx] || 'Hi!'), 2000 + OPTS.idx * 1200);
         return;
       }
       say(`Hi, I’m the Test Bot. I’m a real second device running inside this page, so everything goes through the same encryption and connection as any other chat.\n\n${HELP}`);
