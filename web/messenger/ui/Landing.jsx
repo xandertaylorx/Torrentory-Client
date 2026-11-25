@@ -92,11 +92,7 @@ export function Landing({ theme, toggleTheme }) {
 
   return (
     <div className="landing">
-      <header className="topbar">
-        <a className="brand" href="/" title="Torrentory home"><BrandMark />Torrentory<span className="product">Messenger</span></a>
-        <span className="spacer" />
-        <button className="icon-btn" onClick={toggleTheme} aria-label="Toggle theme"><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} /></button>
-      </header>
+      <SiteHeader theme={theme} toggleTheme={toggleTheme} />
 
       <main className="landing-main">
         <section className="hero">
@@ -197,6 +193,27 @@ export function CodeInput({ value, onChange, onEnter, autoFocus }) {
       onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
       onPaste={(e) => { const t = e.clipboardData.getData('text'); const m = t.match(/#c=([a-z-]+)/i); if (m) { e.preventDefault(); onChange(m[1].toLowerCase()); } }}
     />
+  );
+}
+
+// Same header as the rest of torrentory.com, so moving between the site and the messenger feels seamless
+const REPO = 'https://github.com/xandertaylorx/Torrentory-Client';
+function SiteHeader({ theme, toggleTheme }) {
+  return (
+    <header className="site-header">
+      <nav aria-label="Main navigation" className="site-nav">
+        <a href="/" aria-label="Torrentory home" className="site-logo"><BrandMark size={22} />Torrentory</a>
+        <div className="site-links">
+          <a href="/#why" className="hide-md">Why</a>
+          <a href="/#features" className="hide-md">Features</a>
+          <a href="/releases" className="hide-sm">Releases</a>
+          <a href="/chat" className="current" aria-current="page">Messenger</a>
+          <a href={REPO} className="hide-sm">GitHub</a>
+          <button className="site-theme" onClick={toggleTheme} aria-label="Toggle theme"><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} /></button>
+          <a href="/#install" className="site-download">Download</a>
+        </div>
+      </nav>
+    </header>
   );
 }
 
