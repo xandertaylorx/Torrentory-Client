@@ -9,6 +9,7 @@ import {
 import { getState, setState, subscribe, updateChat, updateMember, updateMessage, bumpChat, newChat, toast } from './store.js';
 import { ring, ringback, stopTones, blip } from './tones.js';
 import { saveChat, forgetChat, deleteVault, isUnlocked, saveProfile } from './vault.js';
+import { TunedPeerConnection, AUDIO_CONSTRAINTS, CAMERA_CONSTRAINTS, SCREEN_CONSTRAINTS, setCallSize, readStats } from './rtc.js';
 
 export const APP_ID = 'torrentory-messenger-v1';
 const SESSION_KEY = 'torrentory.messenger.session';
@@ -62,7 +63,7 @@ export async function openChat({ secret, name }, { focus = true, saved = null } 
   setState((s) => ({ chats: { ...s.chats, [id]: chat }, order: s.order.includes(id) ? s.order : [id, ...s.order] }));
   saveSession((cur) => ({ chats: [...(cur.chats || []).filter((c) => c.secret !== secret), { secret, name: name || '' }] }));
 
-  const room = joinRoom({ appId: APP_ID, password: keys.signalPassword, identity: 'none', maxReceiveBytes: 96 * 1024 * 1024 }, keys.roomId);
+  const room = joinRoom({ appId: APP_ID, password: keys.signalPassword, identity: 'none', maxReceiveBytes: 96 * 1024 * 1024, rtcPolyfill: TunedPeerConnection }, keys.roomId);
   const action = room.makeAction('x');
   const c = { id, room, action, keys, eph: newEphemeral(), peers: new Map(), bins, chains: new Map(), seenSent: 0 };
   conns.set(id, c);
@@ -389,7 +390,10 @@ export function renameChat(name, id = getState().active) {
 
 // ---------- calls (one at a time, in any chat) ----------
 const peerIdsOf = (chatId, mid) => getState().chats[chatId]?.members[mid]?.peerIds || [];
-const setCallInfo = (chatId, info) => updateChat(chatId, { callInfo: info });
+const setCallInfo = (chatId, info) => {
+  updateChat(chatId, { callInfo: info });
+  if (getState().call?.chat === chatId) setCallSize(Object.keys(info?.parts || {}).length - 1);
+};
 
 function onCallPacket(c, o, peerId, mid) {
   const st = getState();
@@ -449,12 +453,36 @@ function removeFromCall(chatId, mid, cid) {
   }
 }
 
+// best camera the device offers up to 1080p30; some cameras reject resizeMode, so retry without it
+async function getCamera() {
+  let s;
+  try { s = await navigator.mediaDevices.getUserMedia({ video: CAMERA_CONSTRAINTS }); }
+  catch (e) {
+    if (e?.name !== 'OverconstrainedError') throw e;
+    const { resizeMode, aspectRatio, ...rest } = CAMERA_CONSTRAINTS;
+    s = await navigator.mediaDevices.getUserMedia({ video: rest });
+  }
+  s.getVideoTracks().forEach((t) => { t.contentHint = 'motion'; });
+  return s;
+}
+
+// connection quality of my current call, for the call header
+export async function callStats() {
+  const call = getState().call;
+  const c = call && conns.get(call.chat);
+  if (!c) return null;
+  const parts = Object.keys(getState().chats[call.chat]?.callInfo?.parts || {});
+  const pcs = Object.entries(c.room.getPeers()).filter(([pid]) => parts.includes(c.peers.get(pid)?.mid)).map(([, p]) => p.connection);
+  return readStats(pcs);
+}
+
 async function getMedia(video) {
   try {
-    const audio = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    const audio = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+    audio.getAudioTracks().forEach((t) => { t.contentHint = 'speech'; });
     let cam = null;
     if (video) {
-      try { cam = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } }); }
+      try { cam = await getCamera(); }
       catch { toast('Camera unavailable, joining with audio', 'warn'); }
     }
     return { audio, cam, screen: null };
@@ -566,7 +594,7 @@ export async function toggleCam() {
     local.cam = null;
     setState({ call: { ...getState().call, cam: false } });
   } else {
-    try { local.cam = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } }); }
+    try { local.cam = await getCamera(); }
     catch { toast('Camera unavailable', 'warn'); return; }
     setState({ call: { ...getState().call, cam: true } });
     const t = callTargets();
@@ -585,7 +613,10 @@ export async function toggleScreen() {
     local.screen = null;
     setState({ call: { ...getState().call, screen: false } });
   } else {
-    try { local.screen = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }); }
+    try {
+      local.screen = await navigator.mediaDevices.getDisplayMedia(SCREEN_CONSTRAINTS);
+      local.screen.getVideoTracks().forEach((t) => { t.contentHint = 'detail'; });
+    }
     catch { return; }
     local.screen.getVideoTracks()[0].addEventListener('ended', () => { if (getState().call?.screen) toggleScreen(); });
     setState({ call: { ...getState().call, screen: true } });

@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../lib/store.js';
-import { leaveCall, toggleMic, toggleCam, toggleScreen, setMinimized, getLocalStreams, joinCall, declineCall } from '../lib/session.js';
+import { leaveCall, toggleMic, toggleCam, toggleScreen, setMinimized, getLocalStreams, joinCall, declineCall, callStats } from '../lib/session.js';
 import { Avatar, useNow } from './common.jsx';
 import { Icon } from './icons.jsx';
 import { fmtTime } from '../lib/media.js';
@@ -61,6 +61,26 @@ function Tile({ member, audio, video, mirror, mic, label, screen }) {
   );
 }
 
+// live connection readout: resolution, frame rate and delay, from WebRTC stats
+function Quality() {
+  const [q, setQ] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => { try { const r = await callStats(); if (alive) setQ(r); } catch {} };
+    tick();
+    const t = setInterval(tick, 2000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  if (!q || q.ms == null) return null;
+  const res = q.height ? `${q.height >= 1060 ? '1080p' : q.height >= 700 ? '720p' : q.height >= 520 ? '540p' : q.height + 'p'} · ${q.fps} fps · ` : '';
+  const label = q.quality === 'good' ? 'Excellent connection' : q.quality === 'ok' ? 'Fair connection' : 'Weak connection';
+  return (
+    <span className={`call-quality ${q.quality}`} title={`${label}${q.loss ? ` · ${(q.loss * 100).toFixed(1)}% loss` : ''}`}>
+      <i /><i /><i />{res}{q.ms} ms
+    </span>
+  );
+}
+
 export function CallOverlay() {
   const call = useStore((s) => s.call);
   const info = useStore((s) => (s.call ? s.chats[s.call.chat]?.callInfo : null));
@@ -105,6 +125,8 @@ export function CallOverlay() {
           <b>{room.name}</b>
           <span>{others.length ? dur : 'Ringing'} · Direct, encrypted</span>
         </div>
+        <span className="spacer" />
+        {others.length > 0 && <Quality />}
         <button className="round ghost" onClick={() => setMinimized(true)} aria-label="Minimize"><Icon name="minimize" size={18} /></button>
       </header>
       <div className={`tiles n${Math.min(tiles.length, 6)}`}>
