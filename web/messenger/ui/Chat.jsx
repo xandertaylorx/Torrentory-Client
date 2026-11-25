@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useStore, useChat, setState, getState, toast } from '../lib/store.js';
-import { leaveChat, startCall, joinCall, renameChat, setProfile, setActive, openChat, burnAll } from '../lib/session.js';
+import { leaveChat, startCall, joinCall, renameChat, setProfile, setActive, openChat, burnAll, setKeep, currentProfile, saveSession } from '../lib/session.js';
+import { createVault, unlockVault, lockVault, isUnlocked } from '../lib/vault.js';
 import { shareCode, regenerateCode, answerKnock, joinWithCode, cancelJoin, shareText, looksLikeCode } from '../lib/invite.js';
 import { newRoomSecret } from '../lib/crypto.js';
 import { Avatar, Sheet, useNow, timeOf } from './common.jsx';
@@ -51,6 +52,7 @@ export function Chat({ theme, toggleTheme }) {
       {sheet === 'info' && <InfoSheet />}
       {sheet === 'profile' && <ProfileSheet />}
       {sheet === 'burn' && <BurnSheet />}
+      {sheet === 'vault' && <VaultSheet />}
       <JoiningSheet />
     </div>
   );
@@ -95,6 +97,7 @@ function ChatRow({ chat, active, me }) {
   const who = last && (last.mid === me.mid ? 'You' : (chat.members[last.mid]?.name || last.name));
   const here = Object.values(chat.members).filter((m) => m.online && !m.self).map((m) => m.name);
   const preview = !last ? (here.length ? `${here.slice(0, 2).join(', ')}${here.length > 2 ? ` +${here.length - 2}` : ''} ${here.length === 1 ? 'is' : 'are'} here` : 'Waiting for people to join')
+    : last.kind === 'system' ? last.text
     : last.deleted ? 'Message deleted'
     : `${who}: ${last.kind === 'image' ? 'Photo' : last.kind === 'voice' ? 'Voice message' : last.text}`;
   return (
@@ -190,10 +193,28 @@ function ChatHeader() {
         <span className={typers.length ? 'typing' : ''}>{sub}</span>
       </button>
       <span className="spacer" />
+      <KeptChip chat={chat} />
       <button className="btn sm" onClick={() => setState({ sheet: 'invite' })}><Icon name="users" size={14} /> Invite</button>
       <button className="btn sm square" disabled={!!call || !others.length} onClick={() => (info ? joinCall(false) : startCall(false))} aria-label="Voice call" title="Voice call"><Icon name="phone" size={15} /></button>
       <button className="btn sm square" disabled={!!call || !others.length} onClick={() => (info ? joinCall(true) : startCall(true))} aria-label="Video call" title="Video call"><Icon name="video" size={15} /></button>
     </header>
+  );
+}
+
+function keptNames(chat) {
+  const names = Object.keys(chat.keepers || {}).map((mid) => chat.members[mid]?.name || 'Someone');
+  if (chat.kept) names.unshift('you');
+  return names;
+}
+
+function KeptChip({ chat }) {
+  const names = keptNames(chat);
+  if (!names.length) return null;
+  const label = names.length === 1 ? names[0] : names.length === 2 ? `${names[0]} and ${names[1]}` : `${names[0]} +${names.length - 1}`;
+  return (
+    <button className="kept-chip" onClick={() => setState({ sheet: 'info' })} title="People keeping a copy of this chat on their device">
+      <Icon name="save" size={13} /> Kept by {label}
+    </button>
   );
 }
 
@@ -358,6 +379,7 @@ function InfoSheet() {
           onBlur={() => name.trim() && name.trim() !== chat.name && renameChat(name.trim())}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
       </label>
+      <KeepSection chat={chat} />
       <div className="side-label flush">People <span>{list.length}</span></div>
       <ul className="members">
         {list.map((m) => (
@@ -383,7 +405,84 @@ function InfoSheet() {
         </ol>
       )}
       <div className="row end">
-        <button className="btn danger" onClick={() => leaveChat(chat.id)}>Leave chat</button>
+        <button className="btn danger" onClick={() => leaveChat(chat.id)}>{chat.kept ? 'Leave and delete saved copy' : 'Leave chat'}</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function KeepSection({ chat }) {
+  const others = Object.keys(chat.keepers || {}).map((mid) => chat.members[mid]?.name || 'Someone');
+  const toggle = async () => {
+    if (chat.kept) { await setKeep(false, chat.id); return; }
+    if (!isUnlocked()) { setState({ sheet: 'vault', vaultFor: chat.id }); return; }
+    await setKeep(true, chat.id);
+  };
+  return (
+    <div className="keep-box">
+      <label className={`toggle-row ${chat.kept ? 'on' : ''}`}>
+        <span className="toggle-text">
+          <b>Keep a copy on this device</b>
+          <small>Saves this chat, its photos and voice notes in this browser, locked with your passphrase, so you can reopen it later. Everyone in the chat is told.</small>
+        </span>
+        <input type="checkbox" checked={!!chat.kept} onChange={toggle} />
+        <span className="switch" />
+      </label>
+      {others.length > 0 && <p className="keep-note"><Icon name="save" size={13} /> {others.join(', ')} {others.length === 1 ? 'is' : 'are'} keeping a copy.</p>}
+      <p className="hint small">The notice works for everyone using this app. It can't stop a screenshot or a modified app, so only share what you're comfortable with.</p>
+    </div>
+  );
+}
+
+function VaultSheet() {
+  const chatId = useStore((s) => s.vaultFor);
+  const [pass, setPass] = useState('');
+  const [again, setAgain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const vault = useStore((s) => s.vault);
+  const unlocking = vault === 'locked';
+  const strong = pass.length >= 10 ? 'good' : pass.length >= 8 ? 'ok' : 'short';
+  const submit = async () => {
+    setErr('');
+    if (!unlocking) {
+      if (pass.length < 8) { setErr('Use at least 8 characters.'); return; }
+      if (pass !== again) { setErr("Those don't match."); return; }
+    }
+    setBusy(true);
+    try {
+      if (unlocking) {
+        const { profile } = await unlockVault(pass);
+        // saved chats belong to the vault's identity: switch to it and reload, which restores them
+        saveSession({ id: profile.id, name: profile.name, avatar: profile.avatar });
+        location.replace(location.pathname);
+        return;
+      }
+      await createVault(pass, currentProfile());
+      setState({ vault: 'unlocked', sheet: 'info' });
+      if (chatId) await setKeep(true, chatId);
+    } catch (e) { setErr(e.message || 'Something went wrong'); setBusy(false); }
+  };
+  return (
+    <Sheet title={unlocking ? 'Unlock saved chats' : 'Choose a passphrase'} onClose={() => setState({ sheet: 'info' })}>
+      <p className="sheet-lede">{unlocking
+        ? 'Enter the passphrase for the chats saved on this device.'
+        : 'Saved chats are encrypted with this passphrase. You’ll need it to open them again. There is no way to recover it, so pick something you’ll remember.'}</p>
+      <label className="field"><span>Passphrase</span>
+        <input type="password" className="pass-input" value={pass} autoFocus onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (unlocking ? submit() : null)} />
+      </label>
+      {!unlocking && (
+        <>
+          <div className={`pass-meter ${strong}`}><i /><i /><i /></div>
+          <label className="field"><span>Type it again</span>
+            <input type="password" className="pass-input" value={again} onChange={(e) => setAgain(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
+          </label>
+        </>
+      )}
+      {err && <p className="form-err">{err}</p>}
+      <div className="row end">
+        <button className="btn" onClick={() => setState({ sheet: 'info' })}>Cancel</button>
+        <button className="btn primary" disabled={busy || !pass} onClick={submit}>{busy ? 'Working…' : unlocking ? 'Unlock' : 'Save and keep this chat'}</button>
       </div>
     </Sheet>
   );
@@ -391,12 +490,19 @@ function InfoSheet() {
 
 function ProfileSheet() {
   const me = useStore((s) => s.me);
+  const vault = useStore((s) => s.vault);
   const [name, setName] = useState(me.name);
   const [avatar, setAvatar] = useState(me.avatar);
   const save = () => { if (name.trim()) { setProfile({ name: name.trim(), avatar }); setState({ sheet: null }); } };
   return (
     <Sheet title="Your profile" onClose={() => setState({ sheet: null })}>
       <ProfileEditor name={name} setName={setName} avatar={avatar} setAvatar={setAvatar} compact />
+      {vault === 'unlocked' && (
+        <div className="vault-row">
+          <span><Icon name="save" size={14} /> Saved chats are unlocked in this tab.</span>
+          <button className="btn sm" onClick={() => { lockVault(); sessionStorage.clear(); location.replace(location.pathname); }}>Lock and close</button>
+        </div>
+      )}
       <div className="row end"><button className="btn primary" onClick={save}>Save</button></div>
     </Sheet>
   );
@@ -406,7 +512,7 @@ function BurnSheet() {
   const n = getState().order.length;
   return (
     <Sheet title="Burn this session?" onClose={() => setState({ sheet: null })}>
-      <p>This leaves all {n} {n === 1 ? 'chat' : 'chats'}, wipes every message and photo from this tab's memory, and forgets your profile and keys. Other people keep what's on their screens until they close them.</p>
+      <p>This leaves all {n} {n === 1 ? 'chat' : 'chats'}, wipes every message and photo from this tab's memory, deletes any chats saved on this device, and forgets your profile and keys. Other people keep what's on their screens until they close them.</p>
       <div className="row end">
         <button className="btn" onClick={() => setState({ sheet: null })}>Cancel</button>
         <button className="btn danger" onClick={burnAll}>Burn everything</button>

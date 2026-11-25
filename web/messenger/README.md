@@ -27,7 +27,8 @@ Mic, camera and calls need HTTPS (or localhost), so deploy it before using it be
 - **Photos**: drag-drop, paste or pick; optional **send blurred** (tap to reveal). Location and camera metadata are stripped by re-encoding.
 - **Calls**: voice and video, group (mesh), mute, camera on/off, screen share, speaking indicator, minimize to a pill, ringtones made with WebAudio.
 - **History without storage**: when someone joins or refreshes, people already in the room hand them recent history from memory. Every message is signed by its author, so a relayed copy can't be forged.
-- **Burn session**: wipes the tab's memory and session.
+- **Keep a copy (opt-in, per chat)**: in Chat info. The chat, its photos and voice notes are saved in this browser's IndexedDB, encrypted with a passphrase only you know (scrypt N=2^16 → AES-256-GCM; `lib/vault.js`). **Everyone in the chat is told**: a notice line ("Alex is keeping a copy of this chat on their device") and a *Kept by* marker in the header, including for people who join later; they're told again if it's turned off. Next visit, a *Welcome back* screen asks for the passphrase and reopens kept chats with their history, under the same identity, so people still in the chat reconnect and anyone who rejoins gets the history back. The notice is honest about its limit: it covers everyone using this app, but nothing stops a screenshot or a modified client. There is no passphrase recovery; *Forgot it?* deletes the saved chats.
+- **Burn session**: wipes the tab's memory, the session and any saved chats on this device.
 
 ## Encryption layers (`src/lib/crypto.js`)
 

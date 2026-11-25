@@ -3,9 +3,10 @@ import { Icon } from './icons.jsx';
 import { avatarSrc, randomSeeds } from '../lib/avatars.js';
 import { squareAvatar } from '../lib/media.js';
 import { unb64u, fromUtf8 } from '../lib/crypto.js';
-import { loadSession, setProfile, startApp, openChat } from '../lib/session.js';
+import { loadSession, saveSession, setProfile, startApp, openChat } from '../lib/session.js';
 import { joinWithCode, normalizeCode, looksLikeCode } from '../lib/invite.js';
-import { toast, setState } from '../lib/store.js';
+import { toast, setState, useStore } from '../lib/store.js';
+import { unlockVault, deleteVault } from '../lib/vault.js';
 import { HowItWorks } from './HowItWorks.jsx';
 
 export function parseInvite(text) {
@@ -75,6 +76,8 @@ export function Landing({ theme, toggleTheme }) {
   const [avatar, setAvatar] = useState(session?.avatar?.startsWith('p:') ? null : session?.avatar || null);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const vault = useStore((s) => s.vault);
+  const [fresh, setFresh] = useState(false);
 
   const go = async (next) => {
     if (!name.trim()) { toast('Pick a name first', 'warn'); return; }
@@ -102,6 +105,7 @@ export function Landing({ theme, toggleTheme }) {
           <p className="lede">No accounts, no servers, no database. Share a three-word code, and when everyone closes the tab the conversation is gone.</p>
         </section>
 
+        {vault === 'locked' && !fresh ? <UnlockPanel target={target} onFresh={() => setFresh(true)} /> : (
         <section className="panel setup">
           <div className="panel-bar">
             <span className="lights"><i /><i /><i /></span>
@@ -126,14 +130,60 @@ export function Landing({ theme, toggleTheme }) {
               </>
             )}
           </div>
-          <div className="panel-foot"><span className="sig" />Your profile lives in this tab only</div>
+          <div className="panel-foot"><span className="sig" />Your profile lives in this tab only{vault === 'locked' && <button className="link small foot-link" onClick={() => setFresh(false)}>Unlock saved chats instead</button>}</div>
         </section>
+        )}
 
         <p className="specs">Ed25519 · XChaCha20-Poly1305 · X25519 · AES-256-GCM · WebRTC DTLS</p>
       </main>
       <HowItWorks floating />
       <footer className="landing-foot"><span>© Torrentory · Built by Crooli</span><span className="dim">Keys stay in this tab. Nothing is sent to a server.</span></footer>
     </div>
+  );
+}
+
+function UnlockPanel({ target, onFresh }) {
+  const [pass, setPass] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const unlock = async () => {
+    if (!pass) return;
+    setBusy(true); setErr('');
+    try {
+      const { profile, chats } = await unlockVault(pass);
+      saveSession({ id: profile.id, name: profile.name, avatar: profile.avatar });
+      setState({ vault: 'unlocked' });
+      await startApp({ saved: chats });
+      history.replaceState(null, '', location.pathname);
+      if (target?.code) joinWithCode(target.code);
+      else if (target?.secret) await openChat(target);
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+  return (
+    <section className="panel setup">
+      <div className="panel-bar">
+        <span className="lights"><i /><i /><i /></span>
+        <span className="panel-title">Welcome back</span>
+        <span className="panel-note">saved on this device</span>
+      </div>
+      <div className="panel-body">
+        <p className="unlock-lede">You have chats saved in this browser. Enter your passphrase to open them.</p>
+        <div className="row">
+          <input type="password" className="pass-input" value={pass} placeholder="Passphrase" autoFocus onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && unlock()} />
+          <button className="btn primary" disabled={busy || !pass} onClick={unlock}>{busy ? 'Unlocking…' : 'Unlock'}</button>
+        </div>
+        {err && <p className="form-err">{err}</p>}
+        <div className="divider" />
+        <div className="unlock-alt">
+          <button className="link small" onClick={onFresh}>Start fresh without them</button>
+          {confirmDelete
+            ? <span className="confirm-del">Delete every saved chat? This can't be undone. <button className="link small danger" onClick={async () => { await deleteVault(); location.reload(); }}>Delete</button> <button className="link small" onClick={() => setConfirmDelete(false)}>Cancel</button></span>
+            : <button className="link small" onClick={() => setConfirmDelete(true)}>Forgot it? Delete saved chats</button>}
+        </div>
+      </div>
+      <div className="panel-foot"><span className="sig" />Encrypted with your passphrase. Never sent anywhere.</div>
+    </section>
   );
 }
 

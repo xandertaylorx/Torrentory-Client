@@ -6,8 +6,9 @@ import {
   b64u, unb64u, utf8, concat, rand, deriveRoom, loadIdentity, newIdentity, midFromPk, sign, verify, fromUtf8,
   sealRoom, openRoom, newEphemeral, PairSession, packPayload, unpackPayload, messageSigBytes, safetyCode, chatIdOf,
 } from './crypto.js';
-import { getState, setState, updateChat, updateMember, updateMessage, bumpChat, newChat, toast } from './store.js';
+import { getState, setState, subscribe, updateChat, updateMember, updateMessage, bumpChat, newChat, toast } from './store.js';
 import { ring, ringback, stopTones, blip } from './tones.js';
+import { saveChat, forgetChat, deleteVault, isUnlocked, saveProfile } from './vault.js';
 
 export const APP_ID = 'torrentory-messenger-v1';
 const SESSION_KEY = 'torrentory.messenger.session';
@@ -34,12 +35,15 @@ export function ensureIdentity() {
 }
 export const myMid = () => ident?.mid;
 
-// called once a name is picked: open the app and reconnect every chat from this tab's session
-export async function startApp() {
+// called once a name is picked: open the app and reconnect every chat from this tab's session,
+// plus any chats restored from the vault (with their saved history)
+export async function startApp({ saved = [] } = {}) {
   const s = ensureIdentity();
   const me = { mid: ident.mid, name: s.name, avatar: s.avatar, pkB64: ident.pkB64 };
   setState({ phase: 'app', me });
+  for (const snap of saved) await openChat({ secret: snap.secret, name: snap.name }, { focus: false, saved: snap });
   for (const c of s.chats || []) await openChat(c, { focus: false });
+  setState((st) => ({ order: [...st.order].sort((a, b) => (st.chats[b]?.lastTs || 0) - (st.chats[a]?.lastTs || 0)) }));
   if (!getState().active && getState().order.length) setActive(getState().order[0]);
   window.addEventListener('focus', () => markSeen());
   document.addEventListener('visibilitychange', () => markSeen());
@@ -47,18 +51,20 @@ export async function startApp() {
 
 export const linkFor = (secret, name) => `${location.origin}${location.pathname}#${secret}${name ? '.' + b64u(utf8(name)) : ''}`;
 
-export async function openChat({ secret, name }, { focus = true } = {}) {
+export async function openChat({ secret, name }, { focus = true, saved = null } = {}) {
   const id = chatIdOf(secret);
   if (conns.has(id)) { if (focus) setActive(id); return id; }
   const keys = await deriveRoom(secret);
   const chat = { ...newChat(id, secret, name), link: linkFor(secret, name) };
+  const bins = new Map();
+  if (saved) restoreSnapshot(chat, saved, bins);
   chat.members[ident.mid] = { ...getState().me, online: true, self: true, peerIds: [], joinedAt: Date.now() };
   setState((s) => ({ chats: { ...s.chats, [id]: chat }, order: s.order.includes(id) ? s.order : [id, ...s.order] }));
   saveSession((cur) => ({ chats: [...(cur.chats || []).filter((c) => c.secret !== secret), { secret, name: name || '' }] }));
 
   const room = joinRoom({ appId: APP_ID, password: keys.signalPassword, identity: 'none', maxReceiveBytes: 96 * 1024 * 1024 }, keys.roomId);
   const action = room.makeAction('x');
-  const c = { id, room, action, keys, eph: newEphemeral(), peers: new Map(), bins: new Map(), chains: new Map(), seenSent: 0 };
+  const c = { id, room, action, keys, eph: newEphemeral(), peers: new Map(), bins, chains: new Map(), seenSent: 0 };
   conns.set(id, c);
 
   room.ready?.then(() => updateChat(id, (x) => (x.net === 'connecting' ? { net: 'online' } : {}))).catch(() => updateChat(id, { net: 'error' }));
@@ -95,6 +101,7 @@ export async function leaveChat(id = getState().active) {
   for (const m of getState().chats[id]?.messages || []) if (m.url) URL.revokeObjectURL(m.url);
   conns.delete(id);
   const secret = getState().chats[id]?.secret;
+  if (getState().chats[id]?.kept) forgetChat(id);
   saveSession((cur) => ({ chats: (cur.chats || []).filter((x) => x.secret !== secret) }));
   setState((s) => {
     const chats = { ...s.chats };
@@ -108,6 +115,7 @@ export async function leaveChat(id = getState().active) {
 
 export async function burnAll() {
   for (const id of [...conns.keys()]) await leaveChat(id);
+  await deleteVault();
   sessionStorage.clear();
   location.replace(location.pathname);
 }
@@ -166,7 +174,8 @@ async function onHello(c, body, peerId) {
   const chat = st.chats[c.id];
   await sendTo(c, peerId, { t: 'profile', name: st.me.name, avatar: st.me.avatar });
   await sendTo(c, peerId, { t: 'room', name: chat.name, ts: chat.nameTs });
-  for (const m of chat.messages.slice(-400)) if (!m.deleted) await sendTo(c, peerId, { ...wireMsg(m), h: 1 }, c.bins.get(m.id), { big: (c.bins.get(m.id)?.length || 0) > 200000 });
+  if (chat.kept) await sendTo(c, peerId, { t: 'keep', on: true });
+  for (const m of chat.messages.slice(-400)) if (!m.deleted && m.kind !== 'system') await sendTo(c, peerId, { ...wireMsg(m), h: 1 }, c.bins.get(m.id), { big: (c.bins.get(m.id)?.length || 0) > 200000 });
   if (st.call?.chat === c.id) await sendTo(c, peerId, { t: 'call', a: 'join', cid: st.call.cid, video: st.call.video, mic: st.call.mic, cam: st.call.cam, screen: st.call.screen, quiet: 1 });
 }
 
@@ -229,6 +238,17 @@ function handle(c, o, bin, peerId, mid) {
       if (m && m.mid === mid) { if (m.url) URL.revokeObjectURL(m.url); c.bins.delete(m.id); updateMessage(c.id, o.id, { deleted: true, text: '', url: null }); }
       break;
     }
+    case 'keep': {
+      const was = !!chat.keepers[mid];
+      if (!!o.on === was) break;
+      const keepers = { ...chat.keepers };
+      if (o.on) keepers[mid] = true; else delete keepers[mid];
+      updateChat(c.id, { keepers });
+      const who = chat.members[mid]?.name || 'Someone';
+      systemLine(c.id, o.on ? `${who} is keeping a copy of this chat on their device` : `${who} stopped keeping a copy`, o.on ? 'keep' : 'unkeep');
+      if (o.on && getState().active !== c.id) toast(`${who} is keeping a copy of ${chat.name}`);
+      break;
+    }
     case 'typing': updateMember(c.id, mid, { typingUntil: Date.now() + 3800 }); break;
     case 'seen': updateMember(c.id, mid, { seenTs: Math.max(chat.members[mid]?.seenTs || 0, o.ts || 0) }); break;
     case 'call': return onCallPacket(c, o, peerId, mid);
@@ -246,7 +266,9 @@ function onMsg(c, o, bin, fromMid) {
   if (!o.h && o.mid !== fromMid) return;
   const m = {
     id: o.id, ts: Math.min(o.ts, Date.now() + 60000), mid: o.mid, kind: o.kind, text: o.text || '', mime: o.mime, blur: !!o.blur,
-    dur: o.dur, wave: o.wave, reply: o.reply, name: o.name, r: o.r || {}, verified: true, w: o.w, hgt: o.hgt, tx: typeof o.tx === 'string' ? o.tx.slice(0, 8000) : '',
+    dur: o.dur, wave: o.wave, reply: o.reply, name: o.name, r: o.r || {}, verified: true, w: o.w, hgt: o.hgt, tx: typeof o.tx === 'string' ? o.tx.slice(0, 8000) : undefined,
+    pk: o.pk, sig: o.sig, // kept so this message can be passed on to people who join later
+
   };
   if (bin) {
     c.bins.set(m.id, bin);
@@ -343,6 +365,7 @@ export function markSeen(id = getState().active) {
 
 export function setProfile({ name, avatar }) {
   const s = saveSession({ name, avatar });
+  saveProfile({ id: s.id, name: s.name, avatar: s.avatar }).catch(() => {});
   const st = getState();
   if (!st.me) return;
   setState({ me: { ...st.me, name: s.name, avatar: s.avatar } });
@@ -602,3 +625,81 @@ window.addEventListener('beforeunload', () => {
   const call = getState().call;
   if (call) broadcast(conn(call.chat), { t: 'call', a: 'leave', cid: call.cid });
 });
+
+// ---------- keeping a copy ----------
+function systemLine(chatId, text, tone) {
+  insertMessage(chatId, { id: 'sys-' + b64u(rand(6)), ts: Date.now(), kind: 'system', mid: 'system', text, tone }, false);
+}
+
+// turn "keep a copy" on or off for a chat; everyone in it is told either way
+export async function setKeep(on, id = getState().active) {
+  const chat = getState().chats[id];
+  if (!chat || !!chat.kept === !!on) return;
+  if (on && !isUnlocked()) throw new Error('vault locked');
+  updateChat(id, { kept: !!on });
+  systemLine(id, on ? 'You’re keeping a copy of this chat. Everyone here was told.' : 'You stopped keeping a copy. It was deleted from this device.', on ? 'keep' : 'unkeep');
+  broadcast(conn(id), { t: 'keep', on: !!on });
+  if (on) await saveChat(snapshot(id)); else await forgetChat(id);
+}
+
+const mediaCache = new Map(); // message id -> base64, so autosave doesn't re-encode photos every time
+function snapshot(id) {
+  const chat = getState().chats[id];
+  const c = conns.get(id);
+  const media = {};
+  for (const m of chat.messages) {
+    if (m.deleted || !c?.bins.has(m.id)) continue;
+    if (!mediaCache.has(m.id)) mediaCache.set(m.id, b64u(c.bins.get(m.id)));
+    media[m.id] = mediaCache.get(m.id);
+  }
+  const keepFields = ['id', 'ts', 'mid', 'kind', 'text', 'mime', 'blur', 'dur', 'wave', 'reply', 'name', 'pk', 'sig', 'r', 'w', 'hgt', 'tx', 'deleted', 'size', 'tone'];
+  const messages = chat.messages.map((m) => Object.fromEntries(keepFields.filter((k) => m[k] !== undefined).map((k) => [k, m[k]])));
+  const members = Object.fromEntries(Object.values(chat.members).filter((m) => !m.self).map((m) => [m.mid, { mid: m.mid, name: m.name, avatar: m.avatar, pk: m.pk }]));
+  return { v: 1, id, secret: chat.secret, name: chat.name, nameTs: chat.nameTs, lastTs: chat.lastTs, savedAt: Date.now(), messages, members, media };
+}
+
+function restoreSnapshot(chat, snap, bins) {
+  chat.kept = true;
+  chat.name = snap.name || chat.name;
+  chat.nameTs = snap.nameTs || 0;
+  chat.lastTs = snap.lastTs || 0;
+  for (const [mid, m] of Object.entries(snap.members || {})) {
+    let safety;
+    try { safety = m.pk ? safetyCode(ident.pk, unb64u(m.pk)) : undefined; } catch {}
+    chat.members[mid] = { ...m, online: false, peerIds: [], safety };
+  }
+  chat.messages = (snap.messages || []).filter((m) => m.tone !== 'reopen' && m.text !== 'Reopened from your saved copy').map((m) => {
+    const out = { ...m, status: 'sent', verified: true };
+    const b = snap.media?.[m.id];
+    if (b) {
+      const bin = unb64u(b);
+      bins.set(m.id, bin);
+      mediaCache.set(m.id, b);
+      out.url = URL.createObjectURL(new Blob([bin], { type: m.mime || 'application/octet-stream' }));
+    }
+    return out;
+  });
+  chat.messages.push({ id: 'sys-' + b64u(rand(6)), ts: Date.now(), kind: 'system', mid: 'system', text: 'Reopened from your saved copy', tone: 'reopen' });
+}
+
+// autosave kept chats shortly after they change
+let lastSaved = new Map();
+let saveTimer = null;
+subscribe(() => {
+  if (!isUnlocked()) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const st = getState();
+    for (const chat of Object.values(st.chats)) {
+      if (!chat.kept || lastSaved.get(chat.id) === chat.messages && lastSaved.get(chat.id + ':n') === chat.name) continue;
+      lastSaved.set(chat.id, chat.messages);
+      lastSaved.set(chat.id + ':n', chat.name);
+      saveChat(snapshot(chat.id)).catch(() => {});
+    }
+  }, 1200);
+});
+
+export function currentProfile() {
+  const s = loadSession();
+  return { id: s.id, name: s.name, avatar: s.avatar };
+}

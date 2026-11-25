@@ -40,7 +40,7 @@ export function MessageList({ onReply, onOpenImage }) {
   const jump = () => { const el = scroller.current; el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); };
 
   // who has seen my latest message
-  const lastMine = [...messages].reverse().find((m) => m.mid === me.mid && !m.deleted);
+  const lastMine = [...messages].reverse().find((m) => m.mid === me.mid && !m.deleted && m.kind !== 'system');
   const seers = lastMine ? Object.values(members).filter((m) => !m.self && (m.seenTs || 0) >= lastMine.ts) : [];
 
   const visible = messages;
@@ -49,22 +49,22 @@ export function MessageList({ onReply, onOpenImage }) {
       <div className="messages-inner">
         <EmptyState show={visible.length === 0} />
         {visible.map((m, i) => {
-          const prev = visible[i - 1], next = visible[i + 1];
-          const newDay = !prev || dayOf(prev.ts) !== dayOf(m.ts);
+          const prev = visible[i - 1]?.kind === 'system' ? null : visible[i - 1], next = visible[i + 1]?.kind === 'system' ? null : visible[i + 1];
+          const newDay = i === 0 || dayOf(visible[i - 1].ts) !== dayOf(m.ts);
           const first = newDay || !prev || prev.mid !== m.mid || m.ts - prev.ts > GROUP_MS;
           const last = !next || next.mid !== m.mid || next.ts - m.ts > GROUP_MS || dayOf(next.ts) !== dayOf(m.ts);
           const author = members[m.mid] || { mid: m.mid, name: m.name };
           return (
             <Fragment key={m.id}>
               {newDay && <div className="day"><span>{dayOf(m.ts)}</span></div>}
-              <Message
+              {m.kind === 'system' ? <div className={`sys-line ${m.tone || ''}`}><span>{m.text}</span></div> : <Message
                 m={m} author={author} mine={m.mid === me.mid} first={first} last={last}
                 menuOpen={menuFor === m.id} setMenu={(v) => setMenuFor(v ? m.id : null)}
                 onReply={onReply} onOpenImage={onOpenImage}
                 seers={lastMine?.id === m.id ? seers : null}
                 replyTo={m.reply ? messages.find((x) => x.id === m.reply) : null}
                 members={members}
-              />
+              />}
             </Fragment>
           );
         })}

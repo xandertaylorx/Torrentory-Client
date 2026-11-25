@@ -4,7 +4,7 @@ const STEPS = [
   ['A chat is a key', 'Made on your device and shared only with the people in the chat. No account, no server holding anything.'],
   ['Invite with three words', 'They type the code and knock. You let them in, and the key goes straight to their device.'],
   ['Messages go device to device', 'Locked in five layers of encryption and signed by whoever wrote them. Relays only help you find each other.'],
-  ['Close the tab and it’s gone', 'Nothing is saved. If you refresh, the people still here hand your history back.'],
+  ['Close the tab and it’s gone', 'Unless someone keeps a copy, locked with their passphrase on their own device. Then everyone in the chat is told.'],
 ];
 
 function Diagram() {

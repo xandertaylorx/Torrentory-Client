@@ -14,11 +14,14 @@ let state = {
   joining: null,         // { code, status: 'deriving'|'searching'|'waiting'|'denied'|'notfound', chatName, hostName }
   toasts: [],
   sheet: null,
+  vault: 'none',         // none | locked | unlocked  (saved chats on this device)
 };
 
 export const newChat = (id, secret, name) => ({
   id, secret, name: name || 'New chat', nameTs: 0, link: '', net: 'connecting',
   members: {}, messages: [], incoming: {}, callInfo: null, unread: 0, lastTs: 0,
+  kept: false,           // I'm keeping a copy of this chat in my vault
+  keepers: {},           // mid -> true for other people who said they keep a copy
 });
 
 const subs = new Set();
