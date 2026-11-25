@@ -654,7 +654,9 @@ button.head-text:hover { background: var(--soft); }
   .hide-sm { display: none; }
   .pe-grid { grid-template-columns: repeat(6, 1fr); gap: 7px; }
   .tiles.n2 { grid-template-columns: 1fr; }
-  .tiles.n3, .tiles.n4, .tiles.n5, .tiles.n6 { grid-template-columns: 1fr 1fr; }
+  /* portrait phones: 3-4 people stack as wide tiles (close to the video's own shape); 5-6 use two columns */
+  .tiles.n3, .tiles.n4 { grid-template-columns: 1fr; gap: 6px; padding: 8px; }
+  .tiles.n5, .tiles.n6 { grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; }
   .call-pill { top: auto; bottom: 96px; right: 50%; transform: translateX(50%); }
   .landing-foot { justify-content: center; text-align: center; }
   .hiw.floating { position: relative; left: auto; bottom: auto; display: flex; justify-content: center; margin: 0 0 18px; }

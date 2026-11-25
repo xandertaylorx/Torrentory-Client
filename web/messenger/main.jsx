@@ -30,20 +30,28 @@ async function boot() {
   else if (target?.secret) await openChat(target);
 }
 
-// /chat/test: a fresh chat with the Test Bot, which runs as a second participant in a hidden iframe
+// /chat/test: fresh test chats whose other members are bots, each running as a real separate
+// participant in its own hidden iframe: a 1:1 Test Bot, and a Test Group with three bots
+function spawnBot(secret, params) {
+  const frame = document.createElement('iframe');
+  frame.src = `${location.pathname}?bot=1&${new URLSearchParams(params)}#${secret}`;
+  frame.allow = 'autoplay';
+  frame.title = params.name || 'Test Bot';
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;left:-10px;top:-10px';
+  document.body.appendChild(frame);
+}
+
 async function bootTest() {
   if (!loadSession()?.name) saveSession({ name: 'You' });
   await boot();
   if (getState().phase !== 'app') await startApp();
-  const secret = newRoomSecret();
-  await openChat({ secret, name: 'Test Bot' }, { test: true });
-  const frame = document.createElement('iframe');
-  frame.src = `${location.pathname}?bot=1#${secret}`;
-  frame.allow = 'autoplay';
-  frame.title = 'Test Bot';
-  frame.setAttribute('aria-hidden', 'true');
-  frame.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;left:-10px;top:-10px';
-  document.body.appendChild(frame);
+  const group = newRoomSecret();
+  await openChat({ secret: group, name: 'Test Group' }, { test: true, focus: false });
+  ['Ava', 'Kai', 'Noor'].forEach((name, idx) => spawnBot(group, { name, group: 1, idx, count: 3 }));
+  const solo = newRoomSecret();
+  await openChat({ secret: solo, name: 'Test Bot' }, { test: true });
+  spawnBot(solo, { name: 'Test Bot' });
 }
 
 if (BOT) {
