@@ -20,6 +20,7 @@ Updates are checked on launch. When one is available, choose **Update and restar
 
 - Root, `src/`, `src-tauri/`: the desktop client.
 - `web/`: the client-only marketing and download site. See [website setup](web/README.md).
+- `web/messenger/`: Torrentory Messenger, the peer-to-peer encrypted chat served at `/chat`. See [its README](web/messenger/README.md).
 - `scripts/`: macOS installation and release packaging.
 - [RELEASE.md](RELEASE.md): distribution and release maintenance.
 

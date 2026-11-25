@@ -13,6 +13,7 @@ export function Header() {
           <Link href="/#why" className="hidden hover:text-[var(--fg)] md:block">Why</Link>
           <Link href="/#features" className="hidden hover:text-[var(--fg)] md:block">Features</Link>
           <Link href="/releases" className="hidden hover:text-[var(--fg)] sm:block">Releases</Link>
+          <a href="/chat" className="hover:text-[var(--fg)]">Messenger</a>
           <a href={REPO} className="hover:text-[var(--fg)]">GitHub</a>
           <Link href="/#install" className="btn btn-primary !h-8 !px-3.5 !text-[13px]">Download</Link>
         </div>
